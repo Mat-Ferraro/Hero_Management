@@ -1,9 +1,16 @@
 import random
 
-from battle_simulator import finish_expedition, prepare_expedition_payroll, simulate_multi_stage_dungeon
+from battle_simulator import (
+    exit_game,
+    finish_expedition,
+    is_exit_command,
+    prepare_expedition_payroll,
+    simulate_multi_stage_dungeon,
+)
 from game_state import GameState, create_game
 from models import CLASS_RULES
-from ui import danger, warning
+from save_system import DEFAULT_SAVE_PATH, load_game, save_exists, save_game
+from ui import danger, success, warning
 
 
 def print_header(state: GameState) -> None:
@@ -23,11 +30,19 @@ def main_menu() -> None:
     print("7. View retired heroes")
     print("8. View fallen heroes")
     print("9. View class rules")
-    print("10. Quit")
+    print("10. View manager reputation")
+    print("11. Save game")
+    print("12. Load game")
+    print("13. Quit")
+    print("\nTip: type 'exit', 'quit', or 'q' at most prompts to close the game.")
 
 
 def get_choice(prompt: str, minimum: int, maximum: int):
     raw = input(prompt).strip()
+
+    if is_exit_command(raw):
+        exit_game()
+
     if not raw:
         return None
 
@@ -44,6 +59,13 @@ def get_choice(prompt: str, minimum: int, maximum: int):
     return value
 
 
+def checked_input(prompt: str) -> str:
+    raw = input(prompt).strip()
+    if is_exit_command(raw):
+        exit_game()
+    return raw
+
+
 def view_roster(state: GameState) -> None:
     print("\n=== Roster ===")
 
@@ -53,6 +75,7 @@ def view_roster(state: GameState) -> None:
 
     print(f"Total wage bill per year: {sum(hero.wage_per_year for hero in state.roster)}g")
     print(f"Total outstanding debt: {sum(hero.debt for hero in state.roster)}g")
+    print(f"Pending bereavement payments: {sum(payment.amount for payment in state.pending_bereavement_payments)}g")
 
     for index, hero in enumerate(state.roster, start=1):
         print(f"\n{index}. {hero.display_full()}")
@@ -146,22 +169,23 @@ def choose_dungeon_and_raid(state: GameState) -> None:
 
     total_debt = sum(hero.debt for hero in state.roster)
     total_wage_per_year = sum(hero.wage_per_year for hero in state.roster)
+    total_bereavement = sum(payment.amount for payment in state.pending_bereavement_payments)
 
     print("\nBefore each expedition:")
-    print("- Any outstanding hero debt must be cleared first.")
-    print("- Then all active heroes must be paid their first year of wages.")
-    print("- Later expedition years are settled after loot is recovered.")
+    print("- Any outstanding hero debt must be cleared before entering.")
+    print("- Wages are paid after each dungeon room, because each room equals one year.")
+    print("- If yearly wages cannot be paid, they become debt.")
     print(f"\nCurrent wage bill per year: {total_wage_per_year}g. Current gold: {state.gold}g.")
     print(f"Current outstanding debt: {total_debt}g.")
+    print(f"Pending bereavement payments: {total_bereavement}g.")
 
     print("\n=== Dungeons ===")
     for index, dungeon in enumerate(state.dungeons, start=1):
-        first_year_required = total_debt + total_wage_per_year
-        projected_full_wages = total_wage_per_year * dungeon.years_to_complete
+        projected_full_wages = total_wage_per_year * dungeon.room_count
         print(
             f"{index}. {dungeon.display()} | "
-            f"Required Before Start: {first_year_required}g | "
-            f"Projected Full Wages: {projected_full_wages}g"
+            f"Required Before Start: {total_debt}g debt clearance | "
+            f"Projected Full Wages Over Route: {projected_full_wages}g"
         )
 
     dungeon_choice = get_choice("\nChoose dungeon or blank to cancel: ", 1, len(state.dungeons))
@@ -170,15 +194,15 @@ def choose_dungeon_and_raid(state: GameState) -> None:
 
     dungeon = state.dungeons[dungeon_choice - 1]
 
-    projected_full_wages = total_wage_per_year * dungeon.years_to_complete
+    projected_full_wages = total_wage_per_year * dungeon.room_count
     if projected_full_wages > state.gold:
         print(
             warning(
                 "\nWARNING: You cannot currently afford the full projected wage cost "
-                "for this expedition. Unpaid later-year wages may become debt."
+                "for this dungeon route. Unpaid year-end wages may become debt."
             )
         )
-        proceed = input("Proceed anyway? [y/N]: ").strip().lower()
+        proceed = checked_input("Proceed anyway? [y/N]: ").lower()
         if proceed != "y":
             return
 
@@ -186,7 +210,7 @@ def choose_dungeon_and_raid(state: GameState) -> None:
 
     available_heroes = [hero for hero in state.roster if hero.injured_years_remaining <= 0]
     if not available_heroes:
-        print(danger("No available heroes can raid after payroll/injuries are resolved."))
+        print(danger("No available heroes can raid after debt/injuries are resolved."))
         return
 
     print("\nAvailable heroes:")
@@ -194,7 +218,7 @@ def choose_dungeon_and_raid(state: GameState) -> None:
         print(f"{index}. {hero.display_short()}")
 
     print("\nEnter up to 4 hero numbers separated by commas. Example: 1,2,3")
-    raw_party = input("Party: ").strip()
+    raw_party = checked_input("Party: ")
     if not raw_party:
         return
 
@@ -257,6 +281,34 @@ def view_class_rules() -> None:
             print("  No automatic age decline in this prototype.")
 
 
+def view_manager_reputation(state: GameState) -> None:
+    print("\n" + state.reputation.display())
+
+
+def save_current_game(state: GameState) -> None:
+    path = save_game(state)
+    print(success(f"Game saved to {path}."))
+
+
+def load_saved_game() -> GameState | None:
+    if not save_exists():
+        print(warning(f"No save file found at {DEFAULT_SAVE_PATH}."))
+        return None
+
+    confirm = checked_input(f"Load save from {DEFAULT_SAVE_PATH}? Current unsaved progress will be lost. [y/N]: ").lower()
+    if confirm != "y":
+        return None
+
+    try:
+        state = load_game()
+    except Exception as exc:
+        print(danger(f"Failed to load save: {exc}"))
+        return None
+
+    print(success(f"Loaded save from {DEFAULT_SAVE_PATH}."))
+    return state
+
+
 def run_game() -> None:
     random.seed()
     state = create_game()
@@ -268,7 +320,7 @@ def run_game() -> None:
         print_header(state)
         main_menu()
 
-        choice = get_choice("Choose an action: ", 1, 10)
+        choice = get_choice("Choose an action: ", 1, 13)
         if choice is None:
             continue
 
@@ -291,6 +343,14 @@ def run_game() -> None:
         elif choice == 9:
             view_class_rules()
         elif choice == 10:
+            view_manager_reputation(state)
+        elif choice == 11:
+            save_current_game(state)
+        elif choice == 12:
+            loaded_state = load_saved_game()
+            if loaded_state is not None:
+                state = loaded_state
+        elif choice == 13:
             print("Thanks for playing.")
             break
 

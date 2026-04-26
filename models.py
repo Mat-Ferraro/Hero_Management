@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from hero_specialties import specialty_description
+
 
 STAT_NAMES = ["might", "agility", "mind", "spirit"]
 
@@ -68,11 +70,13 @@ class Hero:
     signing_bonus: int
     wage_per_year: int
     contract_years: int
+    specialty: str = "Adventurer"
     equipment: Dict[str, Item] = field(default_factory=dict)
     injured_years_remaining: int = 0
     wound_history: List[str] = field(default_factory=list)
     current_health: Optional[int] = None
     debt: int = 0
+    is_temporary_survivor: bool = False
 
     def total_stat(self, stat_name: str) -> int:
         total = self.stats.get(stat_name, 0)
@@ -220,9 +224,7 @@ class Hero:
             if self.injured_years_remaining == 0:
                 messages.append(f"{self.name} recovered from injury after {old_injury_years} remaining year(s).")
             else:
-                messages.append(
-                    f"{self.name} is still injured for {self.injured_years_remaining} more year(s)."
-                )
+                messages.append(f"{self.name} is still injured for {self.injured_years_remaining} more year(s).")
 
         messages.extend(self.apply_aging(years_passed))
         return messages
@@ -266,6 +268,8 @@ class Hero:
         return random.random() < self.retirement_chance()
 
     def display_short(self) -> str:
+        survivor_text = " | TEMP SURVIVOR" if self.is_temporary_survivor else ""
+
         injury = ""
         if self.injured_years_remaining > 0:
             injury = f" INJURED {self.injured_years_remaining}y"
@@ -280,9 +284,9 @@ class Hero:
             hp_text = f"HP {self.current_health}/{self.max_health()} {self.health_status()}"
 
         return (
-            f"{self.name} | {self.hero_class} | Age {self.age} | Lv {self.level} | "
+            f"{self.name} | {self.hero_class} ({self.specialty}) | Age {self.age} | Lv {self.level} | "
             f"Power {self.combat_power()} | {hp_text} | Contract {self.contract_years}y | "
-            f"Wage {self.wage_per_year}g/y{debt_text}{injury}"
+            f"Wage {self.wage_per_year}g/y{debt_text}{survivor_text}{injury}"
         )
 
     def display_contract(self) -> str:
@@ -299,6 +303,7 @@ class Hero:
 
         return (
             f"{self.display_short()}\n"
+            f"  Specialty: {self.specialty} - {specialty_description(self.specialty)}\n"
             f"  XP: {self.xp}/{self.xp_to_next_level()}\n"
             f"  Stats: {stat_text}\n"
             f"  Equipment: {equipped}\n"
@@ -325,7 +330,7 @@ class Dungeon:
 
     @property
     def room_count(self) -> int:
-        return self.stages
+        return self.years_to_complete
 
     def room_enemy_power(self, room_number: int, room_type: str) -> int:
         type_multiplier = {
