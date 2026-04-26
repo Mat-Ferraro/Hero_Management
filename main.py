@@ -84,12 +84,36 @@ class Hero:
     equipment: Dict[str, Item] = field(default_factory=dict)
     injured_expeditions: int = 0
     wound_history: List[str] = field(default_factory=list)
+    current_health: Optional[int] = None
 
     def total_stat(self, stat_name: str) -> int:
         total = self.stats.get(stat_name, 0)
         for item in self.equipment.values():
             total += item.stat_bonuses.get(stat_name, 0)
         return total
+
+    def max_health(self) -> int:
+        return 60 + (self.total_stat("might") * 4) + (self.total_stat("spirit") * 3) + (self.level * 8)
+
+    def reset_health_for_expedition(self) -> None:
+        self.current_health = self.max_health()
+
+    def health_percent(self) -> float:
+        if self.current_health is None:
+            return 1.0
+        return max(0.0, self.current_health / self.max_health())
+
+    def health_status(self) -> str:
+        percent = self.health_percent()
+        if percent <= 0:
+            return "DEAD"
+        if percent < 0.25:
+            return "CRITICAL"
+        if percent < 0.50:
+            return "WOUNDED"
+        if percent < 0.75:
+            return "HURT"
+        return "Healthy"
 
     def total_contract_value(self) -> int:
         return self.signing_bonus + (self.wage_per_expedition * self.contract_expeditions)
@@ -146,6 +170,15 @@ class Hero:
         self.stats[random_stat] += 1
         messages.append(f"  +1 {random_stat}")
         return messages
+
+    def take_damage(self, amount: int) -> str:
+        if self.current_health is None:
+            self.reset_health_for_expedition()
+        self.current_health = max(0, self.current_health - amount)
+        return (
+            f"{self.name} took {amount} damage "
+            f"({self.current_health}/{self.max_health()} HP, {self.health_status()})."
+        )
 
     def apply_minor_wound(self) -> str:
         duration = random.randint(1, 2)
@@ -207,9 +240,13 @@ class Hero:
 
     def display_short(self) -> str:
         injury = " INJURED" if self.injured_expeditions > 0 else ""
+        if self.current_health is None:
+            hp_text = f"HP {self.max_health()}/{self.max_health()}"
+        else:
+            hp_text = f"HP {self.current_health}/{self.max_health()} {self.health_status()}"
         return (
             f"{self.name} | {self.hero_class} | Age {self.age} | Lv {self.level} | "
-            f"Power {self.combat_power()} | Contract {self.contract_expeditions} exp | "
+            f"Power {self.combat_power()} | {hp_text} | Contract {self.contract_expeditions} exp | "
             f"Wage {self.wage_per_expedition}g/exp{injury}"
         )
 
@@ -348,25 +385,45 @@ def pay_expedition_wages(state: GameState) -> List[str]:
     return messages
 
 
-def apply_stage_casualties(state: GameState, party: List[Hero], dungeon: Dungeon, stage_success: bool) -> List[str]:
+def apply_stage_damage_and_casualties(
+    state: GameState,
+    party: List[Hero],
+    dungeon: Dungeon,
+    stage_success: bool,
+    enemy_power: int,
+) -> List[str]:
     messages = []
-    risk_multiplier = 0.65 if stage_success else 1.6
+    risk_multiplier = 0.75 if stage_success else 1.45
+    party_power = max(1, sum(hero.combat_power() for hero in party))
+    danger_ratio = enemy_power / party_power
 
     for hero in list(party):
-        death_roll = dungeon.death_chance * risk_multiplier
-        mortal_roll = dungeon.mortal_wound_chance * risk_multiplier
-        minor_roll = dungeon.minor_wound_chance * risk_multiplier
+        base_damage = random.randint(8, 18)
+        scaled_damage = int(base_damage * danger_ratio * risk_multiplier * dungeon.difficulty)
+        damage = max(3, scaled_damage)
+        messages.append(hero.take_damage(damage))
 
-        roll = random.random()
-        if roll < death_roll:
+        if hero.current_health is not None and hero.current_health <= 0:
             party.remove(hero)
             if hero in state.roster:
                 state.roster.remove(hero)
             state.fallen_heroes.append(hero)
-            messages.append(f"{hero.name} was killed in the dungeon.")
-        elif roll < death_roll + mortal_roll:
+            messages.append(f"{hero.name} died from their wounds.")
+            continue
+
+        health_risk = 1.0
+        if hero.health_percent() < 0.25:
+            health_risk = 3.0
+        elif hero.health_percent() < 0.50:
+            health_risk = 1.8
+
+        mortal_roll = dungeon.mortal_wound_chance * risk_multiplier * health_risk
+        minor_roll = dungeon.minor_wound_chance * risk_multiplier * health_risk
+
+        roll = random.random()
+        if roll < mortal_roll:
             messages.append(hero.apply_mortal_wound())
-        elif roll < death_roll + mortal_roll + minor_roll:
+        elif roll < mortal_roll + minor_roll:
             messages.append(hero.apply_minor_wound())
 
     return messages
@@ -382,6 +439,9 @@ def generate_item_drop(dungeon: Dungeon) -> Item:
 
 
 def simulate_multi_stage_dungeon(state: GameState, party: List[Hero], dungeon: Dungeon) -> List[str]:
+    for hero in party:
+        hero.reset_health_for_expedition()
+
     messages = ["=== Dungeon Expedition Begins ===", f"Dungeon: {dungeon.name}"]
     completed_stages = 0
     loot_earned = 0
@@ -425,7 +485,7 @@ def simulate_multi_stage_dungeon(state: GameState, party: List[Hero], dungeon: D
             loot_earned += partial_loot
             messages.append(f"Stage {stage} failed. The party salvaged {partial_loot}g while escaping the immediate threat.")
 
-        messages.extend(apply_stage_casualties(state, party, dungeon, stage_success))
+        messages.extend(apply_stage_damage_and_casualties(state, party, dungeon, stage_success, enemy_power))
 
         if not stage_success:
             choice = input("The stage was failed. Try to push onward anyway? [y/N]: ").strip().lower()
@@ -445,6 +505,7 @@ def simulate_multi_stage_dungeon(state: GameState, party: List[Hero], dungeon: D
 
     for hero in party:
         messages.extend(hero.add_xp(xp_earned))
+        hero.current_health = None
 
     return messages
 
