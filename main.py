@@ -1,8 +1,9 @@
 import random
 
-from battle_simulator import finish_expedition, pay_expedition_wages, simulate_multi_stage_dungeon
+from battle_simulator import finish_expedition, prepare_expedition_payroll, simulate_multi_stage_dungeon
 from game_state import GameState, create_game
 from models import CLASS_RULES
+from ui import danger, warning
 
 
 def print_header(state: GameState) -> None:
@@ -50,7 +51,8 @@ def view_roster(state: GameState) -> None:
         print("No heroes signed yet.")
         return
 
-    print(f"Total wage bill per expedition: {sum(hero.wage_per_expedition for hero in state.roster)}g")
+    print(f"Total wage bill per year: {sum(hero.wage_per_year for hero in state.roster)}g")
+    print(f"Total outstanding debt: {sum(hero.debt for hero in state.roster)}g")
 
     for index, hero in enumerate(state.roster, start=1):
         print(f"\n{index}. {hero.display_full()}")
@@ -87,7 +89,7 @@ def sign_hero(state: GameState) -> None:
     state.roster.append(hero)
     state.available_contracts.pop(choice - 1)
 
-    print(f"Signed {hero.name}. Paid {hero.signing_bonus}g. Wage: {hero.wage_per_expedition}g/expedition.")
+    print(f"Signed {hero.name}. Paid {hero.signing_bonus}g. Wage: {hero.wage_per_year}g/year.")
 
 
 def view_inventory(state: GameState) -> None:
@@ -142,12 +144,25 @@ def choose_dungeon_and_raid(state: GameState) -> None:
         print("You need to sign heroes before raiding dungeons.")
         return
 
-    print("\nBefore each expedition, all active heroes must be paid their wage.")
-    print(f"Current wage bill: {sum(hero.wage_per_expedition for hero in state.roster)}g. Current gold: {state.gold}g.")
+    total_debt = sum(hero.debt for hero in state.roster)
+    total_wage_per_year = sum(hero.wage_per_year for hero in state.roster)
+
+    print("\nBefore each expedition:")
+    print("- Any outstanding hero debt must be cleared first.")
+    print("- Then all active heroes must be paid their first year of wages.")
+    print("- Later expedition years are settled after loot is recovered.")
+    print(f"\nCurrent wage bill per year: {total_wage_per_year}g. Current gold: {state.gold}g.")
+    print(f"Current outstanding debt: {total_debt}g.")
 
     print("\n=== Dungeons ===")
     for index, dungeon in enumerate(state.dungeons, start=1):
-        print(f"{index}. {dungeon.display()}")
+        first_year_required = total_debt + total_wage_per_year
+        projected_full_wages = total_wage_per_year * dungeon.years_to_complete
+        print(
+            f"{index}. {dungeon.display()} | "
+            f"Required Before Start: {first_year_required}g | "
+            f"Projected Full Wages: {projected_full_wages}g"
+        )
 
     dungeon_choice = get_choice("\nChoose dungeon or blank to cancel: ", 1, len(state.dungeons))
     if dungeon_choice is None:
@@ -155,11 +170,23 @@ def choose_dungeon_and_raid(state: GameState) -> None:
 
     dungeon = state.dungeons[dungeon_choice - 1]
 
-    print("\n".join(pay_expedition_wages(state)))
+    projected_full_wages = total_wage_per_year * dungeon.years_to_complete
+    if projected_full_wages > state.gold:
+        print(
+            warning(
+                "\nWARNING: You cannot currently afford the full projected wage cost "
+                "for this expedition. Unpaid later-year wages may become debt."
+            )
+        )
+        proceed = input("Proceed anyway? [y/N]: ").strip().lower()
+        if proceed != "y":
+            return
 
-    available_heroes = [hero for hero in state.roster if hero.injured_expeditions <= 0]
+    print("\n".join(prepare_expedition_payroll(state)))
+
+    available_heroes = [hero for hero in state.roster if hero.injured_years_remaining <= 0]
     if not available_heroes:
-        print("No available heroes can raid after wages/injuries are resolved.")
+        print(danger("No available heroes can raid after payroll/injuries are resolved."))
         return
 
     print("\nAvailable heroes:")

@@ -1,5 +1,4 @@
 import os
-import sys
 
 
 class Color:
@@ -11,7 +10,6 @@ class Color:
     YELLOW = "\033[93m"
     CYAN = "\033[96m"
     MAGENTA = "\033[95m"
-    GRAY = "\033[90m"
 
 
 def enable_windows_ansi_colors() -> None:
@@ -56,21 +54,6 @@ def highlight(text: str) -> str:
 
 def bold(text: str) -> str:
     return color_text(text, Color.BOLD)
-
-
-def format_health_status(status: str) -> str:
-    normalized = status.upper()
-
-    if normalized == "DEAD":
-        return danger(status)
-    if normalized == "CRITICAL":
-        return danger(status)
-    if normalized == "WOUNDED":
-        return warning(status)
-    if normalized == "HURT":
-        return warning(status)
-
-    return success(status)
 
 
 enable_windows_ansi_colors()

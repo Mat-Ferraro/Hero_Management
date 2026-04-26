@@ -18,20 +18,38 @@ class GameState:
     fallen_heroes: List[Hero] = field(default_factory=list)
 
 
-def create_hero(name: str, hero_class: str, age: int, stats: dict, signing_bonus: int, wage: int, contract_expeditions: int) -> Hero:
-    return Hero(name, hero_class, age, 1, 0, stats, signing_bonus, wage, contract_expeditions)
+def create_hero(
+    name: str,
+    hero_class: str,
+    age: int,
+    stats: dict,
+    signing_bonus: int,
+    wage_per_year: int,
+    contract_years: int,
+) -> Hero:
+    return Hero(
+        name=name,
+        hero_class=hero_class,
+        age=age,
+        level=1,
+        xp=0,
+        stats=stats,
+        signing_bonus=signing_bonus,
+        wage_per_year=wage_per_year,
+        contract_years=contract_years,
+    )
 
 
 def create_initial_contracts() -> List[Hero]:
     return [
-        create_hero("Brakka Ironjaw", "Warrior", 26, {"might": 8, "agility": 4, "mind": 2, "spirit": 5}, 80, 18, 4),
-        create_hero("Old Garron", "Warrior", 44, {"might": 10, "agility": 3, "mind": 3, "spirit": 7}, 45, 12, 3),
-        create_hero("Sil Tanglefoot", "Rogue", 22, {"might": 4, "agility": 9, "mind": 4, "spirit": 3}, 75, 17, 4),
-        create_hero("Vera Quickhand", "Rogue", 35, {"might": 5, "agility": 10, "mind": 5, "spirit": 4}, 100, 22, 3),
-        create_hero("Sister Maela", "Cleric", 39, {"might": 3, "agility": 3, "mind": 7, "spirit": 9}, 95, 20, 4),
-        create_hero("Brother Tor", "Cleric", 58, {"might": 3, "agility": 2, "mind": 9, "spirit": 11}, 120, 28, 2),
-        create_hero("Nim the Unready", "Mage", 19, {"might": 1, "agility": 3, "mind": 8, "spirit": 5}, 60, 15, 5),
-        create_hero("Archmage Pell", "Mage", 72, {"might": 1, "agility": 2, "mind": 14, "spirit": 10}, 160, 40, 2),
+        create_hero("Brakka Ironjaw", "Warrior", 26, {"might": 8, "agility": 4, "mind": 2, "spirit": 5}, 80, 18, 6),
+        create_hero("Old Garron", "Warrior", 44, {"might": 10, "agility": 3, "mind": 3, "spirit": 7}, 45, 12, 5),
+        create_hero("Sil Tanglefoot", "Rogue", 22, {"might": 4, "agility": 9, "mind": 4, "spirit": 3}, 75, 17, 6),
+        create_hero("Vera Quickhand", "Rogue", 35, {"might": 5, "agility": 10, "mind": 5, "spirit": 4}, 100, 22, 5),
+        create_hero("Sister Maela", "Cleric", 39, {"might": 3, "agility": 3, "mind": 7, "spirit": 9}, 95, 20, 7),
+        create_hero("Brother Tor", "Cleric", 58, {"might": 3, "agility": 2, "mind": 9, "spirit": 11}, 120, 28, 4),
+        create_hero("Nim the Unready", "Mage", 19, {"might": 1, "agility": 3, "mind": 8, "spirit": 5}, 60, 15, 8),
+        create_hero("Archmage Pell", "Mage", 72, {"might": 1, "agility": 2, "mind": 14, "spirit": 10}, 160, 40, 4),
     ]
 
 
@@ -83,6 +101,6 @@ def refresh_contract_market(state: GameState) -> None:
 
         if hero.name not in names:
             hero.signing_bonus = int(hero.signing_bonus * random.uniform(0.9, 1.2))
-            hero.wage_per_expedition = max(1, int(hero.wage_per_expedition * random.uniform(0.9, 1.2)))
+            hero.wage_per_year = max(1, int(hero.wage_per_year * random.uniform(0.9, 1.2)))
             state.available_contracts.append(hero)
             names.append(hero.name)

@@ -1,9 +1,19 @@
 import random
+from dataclasses import dataclass
 from typing import List
 
 from game_state import GameState, create_item_pool, refresh_contract_market
 from models import Dungeon, Hero, Item
-from ui import danger, highlight, info, success, warning, bold
+from ui import bold, danger, highlight, info, success, warning
+
+
+COMBAT_ROOM_TYPES = {"Monster", "Elite", "Boss"}
+
+
+@dataclass
+class RoomOption:
+    room_type: str
+    description: str
 
 
 def estimate_success_chance(party: List[Hero], enemy_power: int) -> float:
@@ -13,22 +23,97 @@ def estimate_success_chance(party: List[Hero], enemy_power: int) -> float:
     return party_power / (party_power + enemy_power)
 
 
-def pay_expedition_wages(state: GameState) -> List[str]:
-    messages = [bold("=== Expedition Wages ===")]
+def pay_outstanding_debts_before_expedition(state: GameState) -> List[str]:
+    messages = [bold("=== Outstanding Debt Check ===")]
+    any_debt = False
 
     for hero in list(state.roster):
-        if state.gold >= hero.wage_per_expedition:
-            state.gold -= hero.wage_per_expedition
-            messages.append(success(f"Paid {hero.name} {hero.wage_per_expedition}g."))
+        if hero.debt <= 0:
+            continue
+
+        any_debt = True
+        if state.gold >= hero.debt:
+            state.gold -= hero.debt
+            messages.append(success(f"Paid {hero.name}'s outstanding debt of {hero.debt}g."))
+            hero.debt = 0
         else:
             state.roster.remove(hero)
             messages.append(
                 danger(
-                    f"Could not pay {hero.name}'s {hero.wage_per_expedition}g wage. "
-                    f"{hero.name} leaves the guild."
+                    f"{hero.name} was owed {hero.debt}g. You could not clear the debt, "
+                    f"so {hero.name} abandons the guild."
                 )
             )
 
+    if not any_debt:
+        messages.append(success("No outstanding hero debts."))
+
+    return messages
+
+
+def pay_one_year_wages_at_expedition_start(state: GameState) -> List[str]:
+    messages = [bold("=== Year 1 Wages ===")]
+
+    for hero in list(state.roster):
+        if state.gold >= hero.wage_per_year:
+            state.gold -= hero.wage_per_year
+            messages.append(success(f"Paid {hero.name} {hero.wage_per_year}g for the first year."))
+        else:
+            state.roster.remove(hero)
+            messages.append(
+                danger(
+                    f"Could not pay {hero.name}'s first-year wage of {hero.wage_per_year}g. "
+                    f"{hero.name} refuses the expedition and leaves the guild."
+                )
+            )
+
+    return messages
+
+
+def settle_remaining_expedition_wages_as_time_passes(state: GameState, dungeon: Dungeon) -> List[str]:
+    messages = [bold("=== Expedition Wage Settlement ===")]
+
+    if dungeon.years_to_complete <= 1:
+        messages.append(success("No additional years of wages owed for this expedition."))
+        return messages
+
+    additional_years = dungeon.years_to_complete - 1
+    debt_created = False
+
+    for year_index in range(2, dungeon.years_to_complete + 1):
+        messages.append(info(f"Year {year_index} wage settlement:"))
+
+        for hero in list(state.roster):
+            if state.gold >= hero.wage_per_year:
+                state.gold -= hero.wage_per_year
+                messages.append(success(f"  Paid {hero.name} {hero.wage_per_year}g."))
+            else:
+                hero.debt += hero.wage_per_year
+                debt_created = True
+                messages.append(
+                    warning(
+                        f"  Could not pay {hero.name} {hero.wage_per_year}g. "
+                        f"Added to debt. Total owed: {hero.debt}g."
+                    )
+                )
+
+    if debt_created:
+        messages.append(
+            warning(
+                "Unpaid wages became debt. This should later reduce manager reliability/trust "
+                "once the reputation system is added."
+            )
+        )
+    else:
+        messages.append(success(f"All wages were paid for the remaining {additional_years} year(s)."))
+
+    return messages
+
+
+def prepare_expedition_payroll(state: GameState) -> List[str]:
+    messages = []
+    messages.extend(pay_outstanding_debts_before_expedition(state))
+    messages.extend(pay_one_year_wages_at_expedition_start(state))
     return messages
 
 
@@ -54,7 +139,7 @@ def generate_item_drop(dungeon: Dungeon) -> Item:
     return item
 
 
-def format_stage_success_chance(chance: float) -> str:
+def format_success_chance(chance: float) -> str:
     percent = chance * 100
 
     if percent >= 70:
@@ -82,33 +167,66 @@ def print_party_status(party: List[Hero]) -> None:
         print(f"  - {line}")
 
 
-def print_stage_preview(
-    dungeon: Dungeon,
-    stage: int,
-    party: List[Hero],
-    enemy_power: int,
-    loot_earned: int,
-) -> None:
-    party_power = sum(hero.combat_power() for hero in party)
-    success_chance = estimate_success_chance(party, enemy_power)
+def generate_room_options(dungeon: Dungeon, room_number: int) -> List[RoomOption]:
+    if room_number >= dungeon.room_count:
+        return [
+            RoomOption("Boss", "Final boss encounter. High danger, strong XP and loot rewards."),
+        ]
+
+    possible_rooms = [
+        RoomOption("Monster", "Enemy encounter. Grants XP and loot if defeated."),
+        RoomOption("Treasure", "Loot room. No XP, but good gold/item potential. May contain traps."),
+        RoomOption("Shrine", "Recovery room. Heal the party, but no XP."),
+        RoomOption("Event", "Unknown event. Risk/reward outcome."),
+        RoomOption("Elite", "Hard enemy encounter. Better XP and loot than a normal monster room."),
+        RoomOption("Camp", "Safe rest. Small healing, no loot, no XP."),
+    ]
+
+    option_count = 3
+    return random.sample(possible_rooms, option_count)
+
+
+def choose_room_option(dungeon: Dungeon, room_number: int, party: List[Hero]) -> RoomOption:
+    options = generate_room_options(dungeon, room_number)
 
     print("\n" + "-" * 60)
-    print(bold(f"Stage {stage}/{dungeon.stages}: {dungeon.name}"))
-    print(f"Current Party Power: {party_power}")
-    print(f"Stage Enemy Power: {enemy_power}")
-    print(f"Estimated Stage Success Chance: {format_stage_success_chance(success_chance)}")
-    print(f"Loot Secured So Far: {success(f'{loot_earned}g')}")
+    print(bold(f"Room {room_number}/{dungeon.room_count}: Choose Your Path"))
     print_party_status(party)
 
+    for index, option in enumerate(options, start=1):
+        extra = ""
+        if option.room_type in COMBAT_ROOM_TYPES:
+            enemy_power = dungeon.room_enemy_power(room_number, option.room_type)
+            chance = estimate_success_chance(party, enemy_power)
+            extra = f" | Enemy Power {enemy_power} | Expected Combat Edge {format_success_chance(chance)}"
 
-def print_stage_result(stage_messages: List[str], party: List[Hero]) -> None:
-    print("\n" + bold("STAGE RESULT"))
+        print(f"{index}. {option.room_type}: {option.description}{extra}")
+
+    while True:
+        choice = input("Choose next room or blank to retreat: ").strip()
+        if not choice:
+            return RoomOption("Retreat", "The party retreats from the dungeon.")
+
+        try:
+            selected = int(choice)
+        except ValueError:
+            print("Please enter a valid room number.")
+            continue
+
+        if 1 <= selected <= len(options):
+            return options[selected - 1]
+
+        print(f"Please choose a number from 1 to {len(options)}.")
+
+
+def print_room_result(room_messages: List[str], party: List[Hero]) -> None:
+    print("\n" + bold("ROOM RESULT"))
     print("-" * 60)
 
-    for message in stage_messages:
+    for message in room_messages:
         print(message)
 
-    print("\n" + bold("Party After Stage:"))
+    print("\n" + bold("Party After Room:"))
     if not party:
         print(danger("  No heroes remain."))
     else:
@@ -117,22 +235,31 @@ def print_stage_result(stage_messages: List[str], party: List[Hero]) -> None:
     print("-" * 60)
 
 
-def apply_stage_damage_and_casualties(
+def apply_room_damage_and_casualties(
     state: GameState,
     party: List[Hero],
     dungeon: Dungeon,
-    stage_success: bool,
     enemy_power: int,
+    combat_outcome: str,
 ) -> List[str]:
     messages = []
-    risk_multiplier = 0.75 if stage_success else 1.45
+
+    if combat_outcome == "dominant":
+        risk_multiplier = 0.45
+    elif combat_outcome == "stable":
+        risk_multiplier = 0.80
+    elif combat_outcome == "rough":
+        risk_multiplier = 1.20
+    else:
+        risk_multiplier = 1.60
+
     party_power = max(1, sum(hero.combat_power() for hero in party))
     danger_ratio = enemy_power / party_power
 
     for hero in list(party):
         base_damage = random.randint(8, 18)
         scaled_damage = int(base_damage * danger_ratio * risk_multiplier * dungeon.difficulty)
-        damage = max(3, scaled_damage)
+        damage = max(2, scaled_damage)
 
         damage_message = hero.take_damage(damage)
 
@@ -171,92 +298,231 @@ def apply_stage_damage_and_casualties(
     return messages
 
 
+def resolve_combat_room(
+    state: GameState,
+    party: List[Hero],
+    dungeon: Dungeon,
+    room_number: int,
+    room_type: str,
+) -> tuple[List[str], int, int]:
+    messages = []
+    enemy_power = dungeon.room_enemy_power(room_number, room_type)
+    success_chance = estimate_success_chance(party, enemy_power)
+    roll = random.random()
+
+    if roll <= success_chance * 0.55:
+        combat_outcome = "dominant"
+        messages.append(success(f"{room_type} encounter went extremely well. The party dominated the fight."))
+        loot_multiplier = 1.15
+        xp_multiplier = 1.15
+    elif roll <= success_chance:
+        combat_outcome = "stable"
+        messages.append(success(f"{room_type} encounter was cleared. The party held formation."))
+        loot_multiplier = 1.0
+        xp_multiplier = 1.0
+    elif roll <= min(0.95, success_chance + 0.25):
+        combat_outcome = "rough"
+        messages.append(warning(f"{room_type} encounter was costly. The party survived, but took a beating."))
+        loot_multiplier = 0.65
+        xp_multiplier = 0.85
+    else:
+        combat_outcome = "disaster"
+        messages.append(danger(f"{room_type} encounter became a disaster. The party barely escaped the enemy."))
+        loot_multiplier = 0.35
+        xp_multiplier = 0.50
+
+    room_loot = int((random.randint(dungeon.loot_min, dungeon.loot_max) / dungeon.room_count) * loot_multiplier)
+    room_xp = int((dungeon.xp_reward / dungeon.room_count) * xp_multiplier)
+
+    if room_type == "Elite":
+        room_loot = int(room_loot * 1.45)
+        room_xp = int(room_xp * 1.35)
+    elif room_type == "Boss":
+        room_loot = int(room_loot * 2.0)
+        room_xp = int(room_xp * 1.75)
+
+    messages.append(success(f"Recovered {room_loot}g."))
+    messages.append(info(f"Combat XP earned: {room_xp}."))
+
+    messages.extend(
+        apply_room_damage_and_casualties(
+            state=state,
+            party=party,
+            dungeon=dungeon,
+            enemy_power=enemy_power,
+            combat_outcome=combat_outcome,
+        )
+    )
+
+    return messages, room_loot, room_xp
+
+
+def resolve_treasure_room(state: GameState, party: List[Hero], dungeon: Dungeon) -> tuple[List[str], int, int]:
+    messages = []
+    room_loot = random.randint(dungeon.loot_min, dungeon.loot_max) // max(1, dungeon.room_count - 1)
+    messages.append(success(f"The party found an unguarded treasure cache worth {room_loot}g."))
+    room_xp = 0
+
+    if random.random() < 0.30:
+        messages.append(warning("The treasure was trapped."))
+        trap_power = int(dungeon.enemy_power * random.uniform(0.35, 0.65))
+        messages.extend(
+            apply_room_damage_and_casualties(
+                state=state,
+                party=party,
+                dungeon=dungeon,
+                enemy_power=trap_power,
+                combat_outcome="rough",
+            )
+        )
+
+    if random.random() < dungeon.item_drop_chance:
+        item = generate_item_drop(dungeon)
+        state.inventory.append(item)
+        messages.append(highlight(f"The party found an item: {item.display()}"))
+
+    return messages, room_loot, room_xp
+
+
+def resolve_shrine_room(party: List[Hero], dungeon: Dungeon) -> tuple[List[str], int, int]:
+    messages = [highlight("The party discovers a forgotten shrine.")]
+    heal_amount = 12 + (dungeon.difficulty * 4)
+
+    for hero in party:
+        messages.append(success(hero.heal(heal_amount)))
+
+    return messages, 0, 0
+
+
+def resolve_camp_room(party: List[Hero], dungeon: Dungeon) -> tuple[List[str], int, int]:
+    messages = [success("The party finds a defensible camp and takes time to recover.")]
+    heal_amount = 8 + (dungeon.difficulty * 2)
+
+    for hero in party:
+        messages.append(success(hero.heal(heal_amount)))
+
+    return messages, 0, 0
+
+
+def resolve_event_room(state: GameState, party: List[Hero], dungeon: Dungeon) -> tuple[List[str], int, int]:
+    messages = [highlight("The party encounters an unknown event.")]
+    outcome = random.choice(["gold", "heal", "trap", "item", "nothing"])
+
+    if outcome == "gold":
+        room_loot = random.randint(dungeon.loot_min // 4, dungeon.loot_max // 3)
+        messages.append(success(f"A strange bargain pays off. The party gains {room_loot}g."))
+        return messages, room_loot, 0
+
+    if outcome == "heal":
+        heal_amount = 10 + dungeon.difficulty * 3
+        messages.append(success("A mysterious force restores the party."))
+        for hero in party:
+            messages.append(success(hero.heal(heal_amount)))
+        return messages, 0, 0
+
+    if outcome == "trap":
+        messages.append(warning("The unknown room was a trap."))
+        trap_power = int(dungeon.enemy_power * random.uniform(0.45, 0.85))
+        messages.extend(
+            apply_room_damage_and_casualties(
+                state=state,
+                party=party,
+                dungeon=dungeon,
+                enemy_power=trap_power,
+                combat_outcome="rough",
+            )
+        )
+        return messages, 0, 0
+
+    if outcome == "item":
+        item = generate_item_drop(dungeon)
+        state.inventory.append(item)
+        messages.append(highlight(f"The party discovers an item: {item.display()}"))
+        return messages, 0, 0
+
+    messages.append(info("Nothing happens, which may be a blessing in this place."))
+    return messages, 0, 0
+
+
+def resolve_room(
+    state: GameState,
+    party: List[Hero],
+    dungeon: Dungeon,
+    room_number: int,
+    room_option: RoomOption,
+) -> tuple[List[str], int, int]:
+    if room_option.room_type in COMBAT_ROOM_TYPES:
+        return resolve_combat_room(state, party, dungeon, room_number, room_option.room_type)
+
+    if room_option.room_type == "Treasure":
+        return resolve_treasure_room(state, party, dungeon)
+
+    if room_option.room_type == "Shrine":
+        return resolve_shrine_room(party, dungeon)
+
+    if room_option.room_type == "Camp":
+        return resolve_camp_room(party, dungeon)
+
+    if room_option.room_type == "Event":
+        return resolve_event_room(state, party, dungeon)
+
+    return [warning("The party turns back.")], 0, 0
+
+
 def simulate_multi_stage_dungeon(state: GameState, party: List[Hero], dungeon: Dungeon) -> List[str]:
     for hero in party:
         hero.reset_health_for_expedition()
 
     expedition_summary = [bold("=== Dungeon Expedition Summary ==="), f"Dungeon: {dungeon.name}"]
-    completed_stages = 0
+    rooms_completed = 0
     loot_earned = 0
     xp_earned = 0
 
-    for stage in range(1, dungeon.stages + 1):
+    for room_number in range(1, dungeon.room_count + 1):
         if not party:
-            expedition_summary.append(danger("No heroes remain. The expedition has failed."))
+            expedition_summary.append(danger("No heroes remain. The expedition has ended."))
             break
 
-        enemy_power = dungeon.stage_enemy_power(stage)
-        print_stage_preview(dungeon, stage, party, enemy_power, loot_earned)
+        room_option = choose_room_option(dungeon, room_number, party)
 
-        if stage > 1:
-            choice = input("Continue deeper? [y/N]: ").strip().lower()
-            if choice != "y":
-                expedition_summary.append(
-                    warning(f"The party retreats after clearing {completed_stages} stage(s).")
-                )
-                break
+        if room_option.room_type == "Retreat":
+            expedition_summary.append(warning(f"The party retreats after completing {rooms_completed} room(s)."))
+            break
 
-        stage_messages = []
-        success_chance = estimate_success_chance(party, enemy_power)
-        stage_success = random.random() <= success_chance
+        room_messages = [
+            bold(f"Room {room_number}: {room_option.room_type}"),
+            room_option.description,
+        ]
 
-        if stage_success:
-            completed_stages += 1
-            stage_loot = random.randint(dungeon.loot_min, dungeon.loot_max) // dungeon.stages
-            stage_xp = max(1, dungeon.xp_reward // dungeon.stages)
-
-            loot_earned += stage_loot
-            xp_earned += stage_xp
-
-            message = success(
-                f"Stage {stage} cleared. Secured {stage_loot}g and {stage_xp} XP value."
-            )
-            stage_messages.append(message)
-            expedition_summary.append(message)
-        else:
-            partial_loot = random.randint(dungeon.loot_min // 10, dungeon.loot_max // 6) // dungeon.stages
-            loot_earned += partial_loot
-
-            message = danger(
-                f"Stage {stage} failed. The party salvaged {partial_loot}g while escaping."
-            )
-            stage_messages.append(message)
-            expedition_summary.append(message)
-
-        casualty_messages = apply_stage_damage_and_casualties(
+        resolved_messages, room_loot, room_xp = resolve_room(
             state=state,
             party=party,
             dungeon=dungeon,
-            stage_success=stage_success,
-            enemy_power=enemy_power,
+            room_number=room_number,
+            room_option=room_option,
         )
 
-        stage_messages.extend(casualty_messages)
-        expedition_summary.extend(casualty_messages)
+        room_messages.extend(resolved_messages)
+        loot_earned += room_loot
+        xp_earned += room_xp
+        rooms_completed += 1
 
-        print_stage_result(stage_messages, party)
+        expedition_summary.extend(room_messages)
+        print_room_result(room_messages, party)
 
         if not party:
             expedition_summary.append(danger("The expedition ends because the entire party is gone."))
             break
 
-        if not stage_success:
-            choice = input("The stage failed. Try to push onward anyway? [y/N]: ").strip().lower()
-            if choice != "y":
-                expedition_summary.append(warning("The party abandons the expedition."))
-                break
-
     state.gold += loot_earned
     expedition_summary.append(success(f"Total expedition loot: {loot_earned}g."))
+    expedition_summary.append(info(f"Total combat XP earned: {xp_earned}."))
 
-    if completed_stages == dungeon.stages:
-        expedition_summary.append(success("The dungeon was fully cleared!"))
+    if rooms_completed == dungeon.room_count and party:
+        expedition_summary.append(success("The dungeon route was completed!"))
 
-        if random.random() < dungeon.item_drop_chance:
-            item = generate_item_drop(dungeon)
-            state.inventory.append(item)
-            expedition_summary.append(highlight(f"The party found an item: {item.display()}"))
-
+    # Only heroes who went on the quest and survived gain XP.
+    # XP only comes from combat rooms.
     for hero in party:
         xp_messages = hero.add_xp(xp_earned)
 
@@ -269,19 +535,23 @@ def simulate_multi_stage_dungeon(state: GameState, party: List[Hero], dungeon: D
 
 
 def finish_expedition(state: GameState, dungeon: Dungeon) -> List[str]:
-    messages = [bold("=== Time, Contracts, and Retirement ===")]
+    messages = [bold("=== Time, Contracts, Wages, and Retirement ===")]
+
+    messages.extend(settle_remaining_expedition_wages_as_time_passes(state, dungeon))
+
     state.expedition += 1
     state.year += dungeon.years_to_complete
 
     expired_heroes = []
     retired_heroes = []
 
+    # All roster heroes experience the passage of time, whether they went on the quest or stayed home.
     for hero in list(state.roster):
-        messages.extend(hero.advance_after_expedition(dungeon.years_to_complete))
+        messages.extend(hero.advance_time(dungeon.years_to_complete))
 
         if hero.should_retire():
             retired_heroes.append(hero)
-        elif hero.contract_expeditions <= 0:
+        elif hero.contract_years <= 0:
             expired_heroes.append(hero)
 
     for hero in retired_heroes:
