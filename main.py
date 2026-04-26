@@ -1,18 +1,17 @@
 import random
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 # ============================================================
 # Hero Management Autobattler Prototype
 # ------------------------------------------------------------
-# v0.2 Design Direction:
-# - Time is measured in expedition cycles, not weeks.
-# - Dungeons take years to complete.
-# - Contracts last for a number of expeditions.
-# - Heroes have an upfront signing bonus and a wage per expedition.
-# - If you cannot pay a hero's expedition wage, that hero leaves.
-# - Heroes age after expeditions and may retire.
+# v0.3:
+# - Expedition-based contracts and wages
+# - Dungeons take years
+# - Multi-stage dungeons with continue/retreat choices
+# - Minor wounds, mortal wounds, and death
+# - Retired heroes and fallen heroes are tracked
 # ============================================================
 
 
@@ -84,6 +83,7 @@ class Hero:
     contract_expeditions: int
     equipment: Dict[str, Item] = field(default_factory=dict)
     injured_expeditions: int = 0
+    wound_history: List[str] = field(default_factory=list)
 
     def total_stat(self, stat_name: str) -> int:
         total = self.stats.get(stat_name, 0)
@@ -120,7 +120,6 @@ class Hero:
 
     def adjust_xp_for_age(self, base_xp: int) -> int:
         rules = CLASS_RULES[self.hero_class]
-
         if self.age <= rules["young_until"]:
             multiplier = 1.25
         elif self.age <= rules["prime_until"]:
@@ -132,36 +131,46 @@ class Hero:
                 multiplier = 0.95
             else:
                 multiplier = 0.75
-
         return max(1, int(base_xp * multiplier))
 
     def level_up(self) -> List[str]:
         rules = CLASS_RULES[self.hero_class]
         messages = [f"{self.name} reached level {self.level}!"]
-
         for stat in rules["primary_stats"]:
             self.stats[stat] += 2
             messages.append(f"  +2 {stat}")
-
         for stat in rules["secondary_stats"]:
             self.stats[stat] += 1
             messages.append(f"  +1 {stat}")
-
         random_stat = random.choice(STAT_NAMES)
         self.stats[random_stat] += 1
         messages.append(f"  +1 {random_stat}")
-
         return messages
+
+    def apply_minor_wound(self) -> str:
+        duration = random.randint(1, 2)
+        self.injured_expeditions = max(self.injured_expeditions, duration)
+        wound = f"Minor wound: out for {duration} expedition(s)"
+        self.wound_history.append(wound)
+        return f"{self.name} suffered a minor wound and will miss {duration} expedition(s)."
+
+    def apply_mortal_wound(self) -> str:
+        stat = random.choice(STAT_NAMES)
+        loss = random.randint(1, 2)
+        actual_loss = min(loss, max(0, self.stats[stat] - 1))
+        self.stats[stat] -= actual_loss
+        self.injured_expeditions = max(self.injured_expeditions, random.randint(2, 4))
+        wound = f"Mortal wound: -{actual_loss} {stat}"
+        self.wound_history.append(wound)
+        return f"{self.name} suffered a mortal wound: -{actual_loss} {stat}."
 
     def advance_after_expedition(self, years_passed: int) -> List[str]:
         messages = []
         self.contract_expeditions -= 1
-
         if self.injured_expeditions > 0:
             self.injured_expeditions -= 1
             if self.injured_expeditions == 0:
                 messages.append(f"{self.name} has recovered from injury.")
-
         messages.extend(self.apply_aging(years_passed))
         return messages
 
@@ -171,7 +180,6 @@ class Hero:
         self.age += years_passed
         rules = CLASS_RULES[self.hero_class]
         decline_stat = rules["old_decline_stat"]
-
         messages.append(f"{self.name} aged from {old_age} to {self.age}.")
 
         if decline_stat and self.age > rules["prime_until"]:
@@ -185,14 +193,12 @@ class Hero:
                 if random.random() < 0.35:
                     self.stats["mind"] += 1
                     messages.append(f"{self.name}'s studies deepen with age: +1 mind.")
-
         return messages
 
     def retirement_chance(self) -> float:
         rules = CLASS_RULES[self.hero_class]
         if self.age <= rules["retirement_age"]:
             return 0.0
-
         years_over = self.age - rules["retirement_age"]
         return min(0.75, years_over * 0.06)
 
@@ -216,12 +222,14 @@ class Hero:
     def display_full(self) -> str:
         stat_text = ", ".join(f"{stat}: {self.total_stat(stat)}" for stat in STAT_NAMES)
         equipped = ", ".join(f"{slot}: {item.name}" for slot, item in self.equipment.items()) or "None"
+        wounds = "; ".join(self.wound_history) or "None"
         retire_chance = self.retirement_chance() * 100
         return (
             f"{self.display_short()}\n"
             f"  XP: {self.xp}/{self.xp_to_next_level()}\n"
             f"  Stats: {stat_text}\n"
             f"  Equipment: {equipped}\n"
+            f"  Wounds: {wounds}\n"
             f"  Retirement Chance After Expedition: {retire_chance:.1f}%\n"
         )
 
@@ -231,17 +239,25 @@ class Dungeon:
     name: str
     difficulty: int
     years_to_complete: int
+    stages: int
     enemy_power: int
     loot_min: int
     loot_max: int
     xp_reward: int
-    injury_chance: float
+    minor_wound_chance: float
+    mortal_wound_chance: float
+    death_chance: float
     item_drop_chance: float
+
+    def stage_enemy_power(self, stage_number: int) -> int:
+        multiplier = 0.75 + (stage_number * 0.18)
+        return int(self.enemy_power * multiplier)
 
     def display(self) -> str:
         return (
             f"{self.name} | Difficulty {self.difficulty} | {self.years_to_complete} year(s) | "
-            f"Enemy Power {self.enemy_power} | Loot {self.loot_min}-{self.loot_max}g | XP {self.xp_reward}"
+            f"{self.stages} stage(s) | Final Enemy Power {self.enemy_power} | "
+            f"Loot {self.loot_min}-{self.loot_max}g | XP {self.xp_reward}"
         )
 
 
@@ -255,6 +271,7 @@ class GameState:
     inventory: List[Item]
     dungeons: List[Dungeon]
     retired_heroes: List[Hero] = field(default_factory=list)
+    fallen_heroes: List[Hero] = field(default_factory=list)
 
 
 # ============================================================
@@ -262,26 +279,8 @@ class GameState:
 # ============================================================
 
 
-def create_hero(
-    name: str,
-    hero_class: str,
-    age: int,
-    stats: Dict[str, int],
-    signing_bonus: int,
-    wage: int,
-    contract_expeditions: int,
-) -> Hero:
-    return Hero(
-        name=name,
-        hero_class=hero_class,
-        age=age,
-        level=1,
-        xp=0,
-        stats=stats,
-        signing_bonus=signing_bonus,
-        wage_per_expedition=wage,
-        contract_expeditions=contract_expeditions,
-    )
+def create_hero(name: str, hero_class: str, age: int, stats: Dict[str, int], signing_bonus: int, wage: int, contract_expeditions: int) -> Hero:
+    return Hero(name, hero_class, age, 1, 0, stats, signing_bonus, wage, contract_expeditions)
 
 
 def create_initial_contracts() -> List[Hero]:
@@ -299,10 +298,10 @@ def create_initial_contracts() -> List[Hero]:
 
 def create_dungeons() -> List[Dungeon]:
     return [
-        Dungeon("Goblin Toll Caves", 1, 1, 45, 90, 170, 55, 0.08, 0.25),
-        Dungeon("Crypt of Wet Bones", 2, 2, 80, 180, 330, 90, 0.13, 0.35),
-        Dungeon("Bandit King's Vault", 3, 3, 125, 330, 560, 145, 0.20, 0.45),
-        Dungeon("Ash Dragon Hatchery", 4, 5, 185, 650, 1050, 240, 0.30, 0.60),
+        Dungeon("Goblin Toll Caves", 1, 1, 2, 45, 90, 170, 55, 0.07, 0.015, 0.005, 0.25),
+        Dungeon("Crypt of Wet Bones", 2, 2, 3, 80, 180, 330, 90, 0.11, 0.035, 0.012, 0.35),
+        Dungeon("Bandit King's Vault", 3, 3, 4, 125, 330, 560, 145, 0.15, 0.06, 0.025, 0.45),
+        Dungeon("Ash Dragon Hatchery", 4, 5, 5, 185, 650, 1050, 240, 0.20, 0.09, 0.045, 0.60),
     ]
 
 
@@ -322,15 +321,7 @@ def create_item_pool() -> List[Item]:
 
 
 def create_game() -> GameState:
-    return GameState(
-        expedition=1,
-        year=1,
-        gold=500,
-        roster=[],
-        available_contracts=create_initial_contracts(),
-        inventory=[],
-        dungeons=create_dungeons(),
-    )
+    return GameState(1, 1, 500, [], create_initial_contracts(), [], create_dungeons())
 
 
 # ============================================================
@@ -338,60 +329,122 @@ def create_game() -> GameState:
 # ============================================================
 
 
+def estimate_success_chance(party: List[Hero], enemy_power: int) -> float:
+    party_power = sum(hero.combat_power() for hero in party)
+    if party_power <= 0:
+        return 0.0
+    return party_power / (party_power + enemy_power)
+
+
 def pay_expedition_wages(state: GameState) -> List[str]:
     messages = ["=== Expedition Wages ==="]
-
     for hero in list(state.roster):
         if state.gold >= hero.wage_per_expedition:
             state.gold -= hero.wage_per_expedition
             messages.append(f"Paid {hero.name} {hero.wage_per_expedition}g.")
         else:
             state.roster.remove(hero)
-            messages.append(
-                f"Could not pay {hero.name}'s {hero.wage_per_expedition}g wage. "
-                f"{hero.name} leaves the guild."
-            )
+            messages.append(f"Could not pay {hero.name}'s {hero.wage_per_expedition}g wage. {hero.name} leaves the guild.")
+    return messages
+
+
+def apply_stage_casualties(state: GameState, party: List[Hero], dungeon: Dungeon, stage_success: bool) -> List[str]:
+    messages = []
+    risk_multiplier = 0.65 if stage_success else 1.6
+
+    for hero in list(party):
+        death_roll = dungeon.death_chance * risk_multiplier
+        mortal_roll = dungeon.mortal_wound_chance * risk_multiplier
+        minor_roll = dungeon.minor_wound_chance * risk_multiplier
+
+        roll = random.random()
+        if roll < death_roll:
+            party.remove(hero)
+            if hero in state.roster:
+                state.roster.remove(hero)
+            state.fallen_heroes.append(hero)
+            messages.append(f"{hero.name} was killed in the dungeon.")
+        elif roll < death_roll + mortal_roll:
+            messages.append(hero.apply_mortal_wound())
+        elif roll < death_roll + mortal_roll + minor_roll:
+            messages.append(hero.apply_minor_wound())
 
     return messages
 
 
-def simulate_dungeon_run(state: GameState, party: List[Hero], dungeon: Dungeon) -> List[str]:
-    messages = []
-    party_power = sum(hero.combat_power() for hero in party)
-    success_chance = party_power / (party_power + dungeon.enemy_power)
-    roll = random.random()
-    success = roll <= success_chance
+def generate_item_drop(dungeon: Dungeon) -> Item:
+    item = random.choice(create_item_pool())
+    if dungeon.difficulty >= 4 and random.random() < 0.35:
+        return Item(f"Masterwork {item.name}", item.slot, {s: v + 2 for s, v in item.stat_bonuses.items()}, int(item.value * 2.2))
+    if dungeon.difficulty >= 3 and random.random() < 0.5:
+        return Item(f"Fine {item.name}", item.slot, {s: v + 1 for s, v in item.stat_bonuses.items()}, int(item.value * 1.5))
+    return item
 
-    messages.append("=== Dungeon Result ===")
-    messages.append(f"Dungeon: {dungeon.name}")
-    messages.append(f"Time Passed: {dungeon.years_to_complete} year(s)")
-    messages.append(f"Party Power: {party_power}")
-    messages.append(f"Enemy Power: {dungeon.enemy_power}")
-    messages.append(f"Success Chance: {success_chance * 100:.1f}%")
 
-    if success:
-        loot = random.randint(dungeon.loot_min, dungeon.loot_max)
-        state.gold += loot
-        messages.append(f"SUCCESS! The party recovered {loot} gold.")
-        xp_amount = dungeon.xp_reward
-    else:
-        loot = random.randint(dungeon.loot_min // 5, dungeon.loot_max // 3)
-        state.gold += loot
-        messages.append(f"FAILURE. The party escaped with only {loot} gold.")
-        xp_amount = max(1, dungeon.xp_reward // 2)
+def simulate_multi_stage_dungeon(state: GameState, party: List[Hero], dungeon: Dungeon) -> List[str]:
+    messages = ["=== Dungeon Expedition Begins ===", f"Dungeon: {dungeon.name}"]
+    completed_stages = 0
+    loot_earned = 0
+    xp_earned = 0
+
+    for stage in range(1, dungeon.stages + 1):
+        if not party:
+            messages.append("No heroes remain. The expedition has failed.")
+            break
+
+        enemy_power = dungeon.stage_enemy_power(stage)
+        party_power = sum(hero.combat_power() for hero in party)
+        success_chance = estimate_success_chance(party, enemy_power)
+
+        print("\n" + "-" * 60)
+        print(f"Stage {stage}/{dungeon.stages}: {dungeon.name}")
+        print(f"Current Party Power: {party_power}")
+        print(f"Stage Enemy Power: {enemy_power}")
+        print(f"Estimated Stage Success Chance: {success_chance * 100:.1f}%")
+        print(f"Loot Secured So Far: {loot_earned}g")
+        print("Party Status:")
+        for hero in party:
+            print(f"  - {hero.display_short()}")
+
+        if stage > 1:
+            choice = input("Continue deeper? [y/N]: ").strip().lower()
+            if choice != "y":
+                messages.append(f"The party retreats after clearing {completed_stages} stage(s).")
+                break
+
+        stage_success = random.random() <= success_chance
+        if stage_success:
+            completed_stages += 1
+            stage_loot = random.randint(dungeon.loot_min, dungeon.loot_max) // dungeon.stages
+            stage_xp = max(1, dungeon.xp_reward // dungeon.stages)
+            loot_earned += stage_loot
+            xp_earned += stage_xp
+            messages.append(f"Stage {stage} cleared. Secured {stage_loot}g and {stage_xp} XP value.")
+        else:
+            partial_loot = random.randint(dungeon.loot_min // 10, dungeon.loot_max // 6) // dungeon.stages
+            loot_earned += partial_loot
+            messages.append(f"Stage {stage} failed. The party salvaged {partial_loot}g while escaping the immediate threat.")
+
+        messages.extend(apply_stage_casualties(state, party, dungeon, stage_success))
+
+        if not stage_success:
+            choice = input("The stage was failed. Try to push onward anyway? [y/N]: ").strip().lower()
+            if choice != "y":
+                messages.append("The party abandons the expedition.")
+                break
+
+    state.gold += loot_earned
+    messages.append(f"Total expedition loot: {loot_earned}g.")
+
+    if completed_stages == dungeon.stages:
+        messages.append("The dungeon was fully cleared!")
+        if random.random() < dungeon.item_drop_chance:
+            item = generate_item_drop(dungeon)
+            state.inventory.append(item)
+            messages.append(f"The party found an item: {item.display()}")
 
     for hero in party:
-        messages.extend(hero.add_xp(xp_amount))
-
-        if random.random() < dungeon.injury_chance:
-            injury_duration = random.randint(1, 2)
-            hero.injured_expeditions = max(hero.injured_expeditions, injury_duration)
-            messages.append(f"{hero.name} was injured for {injury_duration} expedition(s).")
-
-    if success and random.random() < dungeon.item_drop_chance:
-        item = generate_item_drop(dungeon)
-        state.inventory.append(item)
-        messages.append(f"The party found an item: {item.display()}")
+        messages.extend(hero.add_xp(xp_earned))
 
     return messages
 
@@ -400,18 +453,14 @@ def finish_expedition(state: GameState, dungeon: Dungeon) -> List[str]:
     messages = ["=== Time, Contracts, and Retirement ==="]
     state.expedition += 1
     state.year += dungeon.years_to_complete
-
     expired_heroes = []
     retired_heroes = []
 
     for hero in list(state.roster):
         messages.extend(hero.advance_after_expedition(dungeon.years_to_complete))
-
         if hero.should_retire():
             retired_heroes.append(hero)
-            continue
-
-        if hero.contract_expeditions <= 0:
+        elif hero.contract_expeditions <= 0:
             expired_heroes.append(hero)
 
     for hero in retired_heroes:
@@ -427,21 +476,6 @@ def finish_expedition(state: GameState, dungeon: Dungeon) -> List[str]:
 
     refresh_contract_market(state)
     return messages
-
-
-def generate_item_drop(dungeon: Dungeon) -> Item:
-    item_pool = create_item_pool()
-    item = random.choice(item_pool)
-
-    if dungeon.difficulty >= 4 and random.random() < 0.35:
-        improved_bonuses = {stat: value + 2 for stat, value in item.stat_bonuses.items()}
-        return Item(f"Masterwork {item.name}", item.slot, improved_bonuses, int(item.value * 2.2))
-
-    if dungeon.difficulty >= 3 and random.random() < 0.5:
-        improved_bonuses = {stat: value + 1 for stat, value in item.stat_bonuses.items()}
-        return Item(f"Fine {item.name}", item.slot, improved_bonuses, int(item.value * 1.5))
-
-    return item
 
 
 # ============================================================
@@ -464,25 +498,23 @@ def main_menu() -> None:
     print("5. Equip item")
     print("6. Choose dungeon and raid")
     print("7. View retired heroes")
-    print("8. View class rules")
-    print("9. Quit")
+    print("8. View fallen heroes")
+    print("9. View class rules")
+    print("10. Quit")
 
 
 def get_choice(prompt: str, minimum: int, maximum: int) -> Optional[int]:
     raw = input(prompt).strip()
     if not raw:
         return None
-
     try:
         value = int(raw)
     except ValueError:
         print("Please enter a number.")
         return None
-
     if value < minimum or value > maximum:
         print(f"Please enter a number from {minimum} to {maximum}.")
         return None
-
     return value
 
 
@@ -491,10 +523,7 @@ def view_roster(state: GameState) -> None:
     if not state.roster:
         print("No heroes signed yet.")
         return
-
-    total_wages = sum(hero.wage_per_expedition for hero in state.roster)
-    print(f"Total wage bill per expedition: {total_wages}g")
-
+    print(f"Total wage bill per expedition: {sum(hero.wage_per_expedition for hero in state.roster)}g")
     for index, hero in enumerate(state.roster, start=1):
         print(f"\n{index}. {hero.display_full()}")
 
@@ -504,7 +533,6 @@ def view_contracts(state: GameState) -> None:
     if not state.available_contracts:
         print("No available contracts.")
         return
-
     for index, hero in enumerate(state.available_contracts, start=1):
         print(f"{index}. {hero.display_contract()}")
 
@@ -513,23 +541,17 @@ def sign_hero(state: GameState) -> None:
     view_contracts(state)
     if not state.available_contracts:
         return
-
     choice = get_choice("\nSign which hero? Enter number or blank to cancel: ", 1, len(state.available_contracts))
     if choice is None:
         return
-
     hero = state.available_contracts[choice - 1]
     if state.gold < hero.signing_bonus:
         print(f"Not enough gold. Need {hero.signing_bonus}g for the signing bonus.")
         return
-
     state.gold -= hero.signing_bonus
     state.roster.append(hero)
     state.available_contracts.pop(choice - 1)
-    print(
-        f"Signed {hero.name} for {hero.contract_expeditions} expedition(s). "
-        f"Paid {hero.signing_bonus}g signing bonus. Wage: {hero.wage_per_expedition}g/expedition."
-    )
+    print(f"Signed {hero.name}. Paid {hero.signing_bonus}g. Wage: {hero.wage_per_expedition}g/expedition.")
 
 
 def view_inventory(state: GameState) -> None:
@@ -537,7 +559,6 @@ def view_inventory(state: GameState) -> None:
     if not state.inventory:
         print("No items yet.")
         return
-
     for index, item in enumerate(state.inventory, start=1):
         print(f"{index}. {item.display()}")
 
@@ -546,31 +567,24 @@ def equip_item(state: GameState) -> None:
     if not state.roster:
         print("You need heroes before equipping items.")
         return
-
     if not state.inventory:
         print("No items to equip.")
         return
-
     view_inventory(state)
     item_choice = get_choice("\nChoose item to equip or blank to cancel: ", 1, len(state.inventory))
     if item_choice is None:
         return
-
     item = state.inventory[item_choice - 1]
-
     print("\nChoose hero:")
     for index, hero in enumerate(state.roster, start=1):
         print(f"{index}. {hero.display_short()}")
-
     hero_choice = get_choice("Hero number or blank to cancel: ", 1, len(state.roster))
     if hero_choice is None:
         return
-
     hero = state.roster[hero_choice - 1]
     old_item = hero.equipment.get(item.slot)
     hero.equipment[item.slot] = item
     state.inventory.pop(item_choice - 1)
-
     if old_item:
         state.inventory.append(old_item)
         print(f"Equipped {item.name} to {hero.name}. Returned {old_item.name} to inventory.")
@@ -584,22 +598,17 @@ def choose_dungeon_and_raid(state: GameState) -> None:
         return
 
     print("\nBefore each expedition, all active heroes must be paid their wage.")
-    total_wages = sum(hero.wage_per_expedition for hero in state.roster)
-    print(f"Current wage bill: {total_wages}g. Current gold: {state.gold}g.")
+    print(f"Current wage bill: {sum(hero.wage_per_expedition for hero in state.roster)}g. Current gold: {state.gold}g.")
 
     print("\n=== Dungeons ===")
     for index, dungeon in enumerate(state.dungeons, start=1):
         print(f"{index}. {dungeon.display()}")
-
     dungeon_choice = get_choice("\nChoose dungeon or blank to cancel: ", 1, len(state.dungeons))
     if dungeon_choice is None:
         return
-
     dungeon = state.dungeons[dungeon_choice - 1]
 
-    wage_messages = pay_expedition_wages(state)
-    print("\n".join(wage_messages))
-
+    print("\n".join(pay_expedition_wages(state)))
     available_heroes = [hero for hero in state.roster if hero.injured_expeditions <= 0]
     if not available_heroes:
         print("No available heroes can raid after wages/injuries are resolved.")
@@ -608,26 +617,18 @@ def choose_dungeon_and_raid(state: GameState) -> None:
     print("\nAvailable heroes:")
     for index, hero in enumerate(available_heroes, start=1):
         print(f"{index}. {hero.display_short()}")
-
     print("\nEnter up to 4 hero numbers separated by commas. Example: 1,2,3")
     raw_party = input("Party: ").strip()
     if not raw_party:
         return
-
     try:
         selected_indexes = [int(value.strip()) for value in raw_party.split(",") if value.strip()]
     except ValueError:
         print("Invalid party selection.")
         return
-
-    if not selected_indexes or len(selected_indexes) > 4:
-        print("Party must include 1 to 4 heroes.")
+    if not selected_indexes or len(selected_indexes) > 4 or len(set(selected_indexes)) != len(selected_indexes):
+        print("Party must include 1 to 4 unique heroes.")
         return
-
-    if len(set(selected_indexes)) != len(selected_indexes):
-        print("Cannot select the same hero more than once.")
-        return
-
     party = []
     for index in selected_indexes:
         if index < 1 or index > len(available_heroes):
@@ -635,11 +636,8 @@ def choose_dungeon_and_raid(state: GameState) -> None:
             return
         party.append(available_heroes[index - 1])
 
-    messages = simulate_dungeon_run(state, party, dungeon)
-    print("\n".join(messages))
-
-    finish_messages = finish_expedition(state, dungeon)
-    print("\n".join(finish_messages))
+    print("\n".join(simulate_multi_stage_dungeon(state, party, dungeon)))
+    print("\n".join(finish_expedition(state, dungeon)))
 
 
 def view_retired_heroes(state: GameState) -> None:
@@ -647,9 +645,17 @@ def view_retired_heroes(state: GameState) -> None:
     if not state.retired_heroes:
         print("No retired heroes yet.")
         return
-
     for index, hero in enumerate(state.retired_heroes, start=1):
         print(f"{index}. {hero.name} | {hero.hero_class} | Retired Age {hero.age} | Lv {hero.level}")
+
+
+def view_fallen_heroes(state: GameState) -> None:
+    print("\n=== Fallen Heroes ===")
+    if not state.fallen_heroes:
+        print("No fallen heroes yet.")
+        return
+    for index, hero in enumerate(state.fallen_heroes, start=1):
+        print(f"{index}. {hero.name} | {hero.hero_class} | Died Age {hero.age} | Lv {hero.level}")
 
 
 def refresh_contract_market(state: GameState) -> None:
@@ -657,7 +663,6 @@ def refresh_contract_market(state: GameState) -> None:
     names = [hero.name for hero in state.available_contracts] + [hero.name for hero in state.roster]
     possible_new_heroes = create_initial_contracts()
     random.shuffle(possible_new_heroes)
-
     for hero in possible_new_heroes:
         if len(state.available_contracts) >= target_contract_count:
             break
@@ -682,26 +687,19 @@ def view_class_rules() -> None:
             print("  No automatic age decline in this prototype.")
 
 
-# ============================================================
-# Main Game Loop
-# ============================================================
-
-
 def run_game() -> None:
     random.seed()
     state = create_game()
-
     print("Hero Management Autobattler Prototype")
     print("Recruit heroes, raid dungeons, earn loot, and build your guild.")
 
     while True:
         print_header(state)
         main_menu()
-        choice = get_choice("Choose an action: ", 1, 9)
-
+        choice = get_choice("Choose an action: ", 1, 10)
         if choice is None:
             continue
-        elif choice == 1:
+        if choice == 1:
             view_roster(state)
         elif choice == 2:
             view_contracts(state)
@@ -716,8 +714,10 @@ def run_game() -> None:
         elif choice == 7:
             view_retired_heroes(state)
         elif choice == 8:
-            view_class_rules()
+            view_fallen_heroes(state)
         elif choice == 9:
+            view_class_rules()
+        elif choice == 10:
             print("Thanks for playing.")
             break
 
