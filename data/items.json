@@ -1,0 +1,333 @@
+[
+  {
+    "name": "Rusty Longsword",
+    "slot": "weapon",
+    "rarity": "Common",
+    "stat_bonuses": {
+      "might": 2
+    },
+    "value": 60,
+    "damage_type_bonus": {
+      "Physical": 0.05
+    },
+    "enemy_type_bonus": {
+      "Beasts": 0.05
+    },
+    "enemy_type_resistance": {},
+    "class_restrictions": [
+      "Warrior",
+      "Rogue"
+    ],
+    "enemy_affinity": [
+      "Beasts",
+      "Bandits"
+    ]
+  },
+  {
+    "name": "Knight's Axe",
+    "slot": "weapon",
+    "rarity": "Uncommon",
+    "stat_bonuses": {
+      "might": 4
+    },
+    "value": 150,
+    "damage_type_bonus": {
+      "Physical": 0.1
+    },
+    "enemy_type_bonus": {
+      "Bandits": 0.1
+    },
+    "enemy_type_resistance": {},
+    "class_restrictions": [
+      "Warrior"
+    ],
+    "enemy_affinity": [
+      "Bandits",
+      "Beasts"
+    ]
+  },
+  {
+    "name": "Balanced Dagger",
+    "slot": "weapon",
+    "rarity": "Common",
+    "stat_bonuses": {
+      "agility": 3
+    },
+    "value": 100,
+    "damage_type_bonus": {
+      "Physical": 0.08
+    },
+    "enemy_type_bonus": {
+      "Bandits": 0.08
+    },
+    "enemy_type_resistance": {},
+    "class_restrictions": [
+      "Rogue"
+    ],
+    "enemy_affinity": [
+      "Bandits"
+    ]
+  },
+  {
+    "name": "Shadow Bow",
+    "slot": "weapon",
+    "rarity": "Rare",
+    "stat_bonuses": {
+      "agility": 5
+    },
+    "value": 220,
+    "damage_type_bonus": {
+      "Physical": 0.12
+    },
+    "enemy_type_bonus": {
+      "Spirits": 0.08
+    },
+    "enemy_type_resistance": {},
+    "class_restrictions": [
+      "Rogue"
+    ],
+    "enemy_affinity": [
+      "Spirits",
+      "Bandits"
+    ]
+  },
+  {
+    "name": "Apprentice Wand",
+    "slot": "weapon",
+    "rarity": "Common",
+    "stat_bonuses": {
+      "mind": 3
+    },
+    "value": 110,
+    "damage_type_bonus": {
+      "Magic": 0.1
+    },
+    "enemy_type_bonus": {
+      "Spirits": 0.08
+    },
+    "enemy_type_resistance": {},
+    "class_restrictions": [
+      "Mage"
+    ],
+    "enemy_affinity": [
+      "Spirits"
+    ]
+  },
+  {
+    "name": "Elder Staff",
+    "slot": "weapon",
+    "rarity": "Rare",
+    "stat_bonuses": {
+      "mind": 5,
+      "spirit": 2
+    },
+    "value": 300,
+    "damage_type_bonus": {
+      "Magic": 0.15
+    },
+    "enemy_type_bonus": {
+      "Dragons": 0.15
+    },
+    "enemy_type_resistance": {
+      "Magic": 0.05
+    },
+    "class_restrictions": [
+      "Mage",
+      "Cleric"
+    ],
+    "enemy_affinity": [
+      "Dragons",
+      "Spirits"
+    ]
+  },
+  {
+    "name": "Blessed Charm",
+    "slot": "trinket",
+    "rarity": "Uncommon",
+    "stat_bonuses": {
+      "spirit": 3
+    },
+    "value": 120,
+    "damage_type_bonus": {
+      "Holy": 0.1
+    },
+    "enemy_type_bonus": {
+      "Undead": 0.15,
+      "Demons": 0.1
+    },
+    "enemy_type_resistance": {
+      "Undead": 0.1
+    },
+    "class_restrictions": [],
+    "enemy_affinity": [
+      "Undead",
+      "Demons"
+    ]
+  },
+  {
+    "name": "War Banner",
+    "slot": "trinket",
+    "rarity": "Uncommon",
+    "stat_bonuses": {
+      "might": 1,
+      "spirit": 2
+    },
+    "value": 140,
+    "damage_type_bonus": {
+      "Physical": 0.05
+    },
+    "enemy_type_bonus": {
+      "Beasts": 0.05
+    },
+    "enemy_type_resistance": {
+      "Bandits": 0.05
+    },
+    "class_restrictions": [
+      "Warrior"
+    ],
+    "enemy_affinity": [
+      "Beasts",
+      "Bandits"
+    ]
+  },
+  {
+    "name": "Quickstep Boots",
+    "slot": "boots",
+    "rarity": "Common",
+    "stat_bonuses": {
+      "agility": 2
+    },
+    "value": 75,
+    "damage_type_bonus": {},
+    "enemy_type_bonus": {},
+    "enemy_type_resistance": {
+      "Beasts": 0.05,
+      "Bandits": 0.05
+    },
+    "class_restrictions": [],
+    "enemy_affinity": [
+      "Beasts",
+      "Bandits"
+    ]
+  },
+  {
+    "name": "Scholar's Ring",
+    "slot": "trinket",
+    "rarity": "Common",
+    "stat_bonuses": {
+      "mind": 2
+    },
+    "value": 90,
+    "damage_type_bonus": {
+      "Magic": 0.05
+    },
+    "enemy_type_bonus": {},
+    "enemy_type_resistance": {
+      "Magic": 0.05
+    },
+    "class_restrictions": [
+      "Mage",
+      "Cleric"
+    ],
+    "enemy_affinity": [
+      "Spirits",
+      "Dragons"
+    ]
+  },
+  {
+    "name": "Silver Mace",
+    "slot": "weapon",
+    "rarity": "Rare",
+    "stat_bonuses": {
+      "spirit": 4,
+      "might": 1
+    },
+    "value": 260,
+    "damage_type_bonus": {
+      "Holy": 0.18
+    },
+    "enemy_type_bonus": {
+      "Undead": 0.2,
+      "Demons": 0.15
+    },
+    "enemy_type_resistance": {},
+    "class_restrictions": [
+      "Cleric"
+    ],
+    "enemy_affinity": [
+      "Undead",
+      "Demons"
+    ]
+  },
+  {
+    "name": "Dragonhide Cloak",
+    "slot": "cloak",
+    "rarity": "Epic",
+    "stat_bonuses": {
+      "spirit": 2,
+      "agility": 1
+    },
+    "value": 420,
+    "damage_type_bonus": {},
+    "enemy_type_bonus": {},
+    "enemy_type_resistance": {
+      "Dragons": 0.25,
+      "Demons": 0.1
+    },
+    "class_restrictions": [],
+    "enemy_affinity": [
+      "Dragons"
+    ]
+  },
+  {
+    "name": "Spirit Lantern",
+    "slot": "trinket",
+    "rarity": "Rare",
+    "stat_bonuses": {
+      "mind": 2,
+      "spirit": 2
+    },
+    "value": 280,
+    "damage_type_bonus": {
+      "Magic": 0.08,
+      "Holy": 0.08
+    },
+    "enemy_type_bonus": {
+      "Spirits": 0.2
+    },
+    "enemy_type_resistance": {
+      "Spirits": 0.15
+    },
+    "class_restrictions": [
+      "Mage",
+      "Cleric"
+    ],
+    "enemy_affinity": [
+      "Spirits"
+    ]
+  },
+  {
+    "name": "Demonbone Ward",
+    "slot": "trinket",
+    "rarity": "Epic",
+    "stat_bonuses": {
+      "spirit": 4
+    },
+    "value": 500,
+    "damage_type_bonus": {
+      "Holy": 0.15
+    },
+    "enemy_type_bonus": {
+      "Demons": 0.2
+    },
+    "enemy_type_resistance": {
+      "Demons": 0.25
+    },
+    "class_restrictions": [
+      "Cleric"
+    ],
+    "enemy_affinity": [
+      "Demons"
+    ]
+  }
+]

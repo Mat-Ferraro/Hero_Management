@@ -17,6 +17,12 @@ def item_to_dict(item: Item) -> Dict:
         "slot": item.slot,
         "stat_bonuses": item.stat_bonuses,
         "value": item.value,
+        "rarity": item.rarity,
+        "damage_type_bonus": item.damage_type_bonus,
+        "enemy_type_bonus": item.enemy_type_bonus,
+        "enemy_type_resistance": item.enemy_type_resistance,
+        "class_restrictions": item.class_restrictions,
+        "enemy_affinity": item.enemy_affinity,
     }
 
 
@@ -24,8 +30,14 @@ def item_from_dict(data: Dict) -> Item:
     return Item(
         name=data["name"],
         slot=data["slot"],
-        stat_bonuses=dict(data["stat_bonuses"]),
+        stat_bonuses=dict(data.get("stat_bonuses", {})),
         value=int(data["value"]),
+        rarity=data.get("rarity", "Common"),
+        damage_type_bonus=dict(data.get("damage_type_bonus", {})),
+        enemy_type_bonus=dict(data.get("enemy_type_bonus", {})),
+        enemy_type_resistance=dict(data.get("enemy_type_resistance", {})),
+        class_restrictions=list(data.get("class_restrictions", [])),
+        enemy_affinity=list(data.get("enemy_affinity", [])),
     )
 
 
@@ -79,6 +91,7 @@ def dungeon_to_dict(dungeon: Dungeon) -> Dict:
         "years_to_complete": dungeon.years_to_complete,
         "stages": dungeon.stages,
         "enemy_power": dungeon.enemy_power,
+        "enemy_type": getattr(dungeon, "enemy_type", "Beasts"),
         "loot_min": dungeon.loot_min,
         "loot_max": dungeon.loot_max,
         "xp_reward": dungeon.xp_reward,
@@ -96,6 +109,7 @@ def dungeon_from_dict(data: Dict) -> Dungeon:
         years_to_complete=int(data["years_to_complete"]),
         stages=int(data.get("stages", data["years_to_complete"])),
         enemy_power=int(data["enemy_power"]),
+        enemy_type=data.get("enemy_type", "Beasts"),
         loot_min=int(data["loot_min"]),
         loot_max=int(data["loot_max"]),
         xp_reward=int(data["xp_reward"]),
@@ -152,7 +166,7 @@ def bereavement_from_dict(data: Dict) -> BereavementPayment:
 
 def game_state_to_dict(state: GameState) -> Dict:
     return {
-        "version": 1,
+        "version": 2,
         "expedition": state.expedition,
         "year": state.year,
         "gold": state.gold,

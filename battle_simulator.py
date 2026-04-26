@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import List
 
+from combat_types import effective_power_against_enemy, incoming_damage_multiplier, item_matches_enemy_type, party_matchup_summary
 from game_state import BereavementPayment, GameState, create_item_pool, refresh_contract_market
 from hero_specialties import (
     apply_life_cleric_healing,
@@ -57,8 +58,24 @@ def exit_game() -> None:
     raise SystemExit
 
 
-def estimate_success_chance(party: List[Hero], enemy_power: int, room_type: str = "Monster") -> float:
-    party_power = effective_party_power_for_room(party, room_type)
+def effective_party_power_for_room_against_enemy(party: List[Hero], room_type: str, enemy_type: str) -> int:
+    total = 0
+
+    for hero in party:
+        base_power = hero.combat_power()
+        base_power += specialty_combat_power_bonus(hero, room_type)
+        total += effective_power_against_enemy(hero, enemy_type, base_power)
+
+    return max(1, total)
+
+
+def estimate_success_chance(
+    party: List[Hero],
+    enemy_power: int,
+    room_type: str = "Monster",
+    enemy_type: str = "Beasts",
+) -> float:
+    party_power = effective_party_power_for_room_against_enemy(party, room_type, enemy_type)
     if party_power <= 0:
         return 0.0
     return party_power / (party_power + enemy_power)
@@ -194,24 +211,48 @@ def advance_one_year_after_room(state: GameState, party: List[Hero], room_number
     return messages
 
 
+def clone_item_with_quality(item: Item, prefix: str, stat_bonus: int, value_multiplier: float, rarity: str) -> Item:
+    return Item(
+        name=f"{prefix} {item.name}",
+        slot=item.slot,
+        stat_bonuses={stat: value + stat_bonus for stat, value in item.stat_bonuses.items()},
+        value=int(item.value * value_multiplier),
+        rarity=rarity,
+        damage_type_bonus=dict(item.damage_type_bonus),
+        enemy_type_bonus=dict(item.enemy_type_bonus),
+        enemy_type_resistance=dict(item.enemy_type_resistance),
+        class_restrictions=list(item.class_restrictions),
+        enemy_affinity=list(item.enemy_affinity),
+    )
+
+
 def generate_item_drop(dungeon: Dungeon, party: List[Hero] | None = None) -> Item:
-    item = random.choice(create_item_pool())
+    item_pool = create_item_pool()
+    weighted_pool = []
+
+    for item in item_pool:
+        weight = 3
+
+        if item_matches_enemy_type(item, dungeon.enemy_type):
+            weight += 5
+
+        if party:
+            for hero in party:
+                if item.can_equip(hero.hero_class):
+                    weight += 1
+
+        weighted_pool.extend([item] * max(1, weight))
+
+    item = random.choice(weighted_pool)
+
+    if dungeon.difficulty >= 5 and random.random() < 0.25:
+        return clone_item_with_quality(item, "Legendary", 3, 3.0, "Legendary")
 
     if dungeon.difficulty >= 4 and random.random() < 0.35:
-        return Item(
-            f"Masterwork {item.name}",
-            item.slot,
-            {stat: value + 2 for stat, value in item.stat_bonuses.items()},
-            int(item.value * 2.2),
-        )
+        return clone_item_with_quality(item, "Masterwork", 2, 2.2, "Epic")
 
     if dungeon.difficulty >= 3 and random.random() < 0.5:
-        return Item(
-            f"Fine {item.name}",
-            item.slot,
-            {stat: value + 1 for stat, value in item.stat_bonuses.items()},
-            int(item.value * 1.5),
-        )
+        return clone_item_with_quality(item, "Fine", 1, 1.5, "Rare")
 
     return item
 
@@ -323,11 +364,14 @@ def choose_room_option(dungeon: Dungeon, room_number: int, party: List[Hero]) ->
     for message in describe_party_specialties(party):
         print(message)
 
+    for message in party_matchup_summary(party, dungeon.enemy_type):
+        print(message)
+
     for index, option in enumerate(options, start=1):
         extra = ""
         if option.room_type in COMBAT_ROOM_TYPES:
             enemy_power = dungeon.room_enemy_power(room_number, option.room_type)
-            chance = estimate_success_chance(party, enemy_power, option.room_type)
+            chance = estimate_success_chance(party, enemy_power, option.room_type, dungeon.enemy_type_for_room(option.room_type))
             extra = f" | Enemy Power {enemy_power} | Expected Combat Edge {format_success_chance(chance)}"
 
         print(f"{index}. {option.room_type}: {option.description}{extra}")
@@ -421,7 +465,7 @@ def apply_room_damage_and_casualties(
 
     risk_multiplier *= first_room_damage_multiplier(party, room_number)
 
-    party_power = max(1, effective_party_power_for_room(party, "Monster"))
+    party_power = max(1, effective_party_power_for_room_against_enemy(party, "Monster", dungeon.enemy_type))
     danger_ratio = enemy_power / party_power
 
     pending_dead_heroes: List[Hero] = []
@@ -429,7 +473,7 @@ def apply_room_damage_and_casualties(
     for hero in list(party):
         base_damage = random.randint(8, 18)
         scaled_damage = int(base_damage * danger_ratio * risk_multiplier * dungeon.difficulty)
-        damage = max(2, scaled_damage)
+        damage = max(2, int(scaled_damage * incoming_damage_multiplier(hero, dungeon.enemy_type)))
 
         damage_message = hero.take_damage(damage)
 
@@ -516,8 +560,10 @@ def resolve_combat_room(
     room_type: str,
 ) -> RoomResolution:
     messages = []
+    enemy_type = dungeon.enemy_type_for_room(room_type)
+    messages.append(info(f"Enemy type: {enemy_type}."))
     enemy_power = dungeon.room_enemy_power(room_number, room_type)
-    success_chance = estimate_success_chance(party, enemy_power, room_type)
+    success_chance = estimate_success_chance(party, enemy_power, room_type, enemy_type)
     roll = random.random()
 
     specialty_bonus_lines = []

@@ -1,0 +1,122 @@
+[
+  {
+    "name": "Brakka Ironjaw",
+    "hero_class": "Warrior",
+    "age": 26,
+    "stats": {
+      "might": 8,
+      "agility": 4,
+      "mind": 2,
+      "spirit": 5
+    },
+    "signing_bonus": 80,
+    "wage_per_year": 18,
+    "contract_years": 6,
+    "specialty": "Guardian"
+  },
+  {
+    "name": "Old Garron",
+    "hero_class": "Warrior",
+    "age": 44,
+    "stats": {
+      "might": 10,
+      "agility": 3,
+      "mind": 3,
+      "spirit": 7
+    },
+    "signing_bonus": 45,
+    "wage_per_year": 12,
+    "contract_years": 5,
+    "specialty": "Vanguard"
+  },
+  {
+    "name": "Sil Tanglefoot",
+    "hero_class": "Rogue",
+    "age": 22,
+    "stats": {
+      "might": 4,
+      "agility": 9,
+      "mind": 4,
+      "spirit": 3
+    },
+    "signing_bonus": 75,
+    "wage_per_year": 17,
+    "contract_years": 6,
+    "specialty": "Treasure Hunter"
+  },
+  {
+    "name": "Vera Quickhand",
+    "hero_class": "Rogue",
+    "age": 35,
+    "stats": {
+      "might": 5,
+      "agility": 10,
+      "mind": 5,
+      "spirit": 4
+    },
+    "signing_bonus": 100,
+    "wage_per_year": 22,
+    "contract_years": 5,
+    "specialty": "Boss Killer"
+  },
+  {
+    "name": "Sister Maela",
+    "hero_class": "Cleric",
+    "age": 39,
+    "stats": {
+      "might": 3,
+      "agility": 3,
+      "mind": 7,
+      "spirit": 9
+    },
+    "signing_bonus": 95,
+    "wage_per_year": 20,
+    "contract_years": 7,
+    "specialty": "Life Cleric"
+  },
+  {
+    "name": "Brother Tor",
+    "hero_class": "Cleric",
+    "age": 58,
+    "stats": {
+      "might": 3,
+      "agility": 2,
+      "mind": 9,
+      "spirit": 11
+    },
+    "signing_bonus": 120,
+    "wage_per_year": 28,
+    "contract_years": 4,
+    "specialty": "Grave Cleric"
+  },
+  {
+    "name": "Nim the Unready",
+    "hero_class": "Mage",
+    "age": 19,
+    "stats": {
+      "might": 1,
+      "agility": 3,
+      "mind": 8,
+      "spirit": 5
+    },
+    "signing_bonus": 60,
+    "wage_per_year": 15,
+    "contract_years": 8,
+    "specialty": "Scholar"
+  },
+  {
+    "name": "Archmage Pell",
+    "hero_class": "Mage",
+    "age": 72,
+    "stats": {
+      "might": 1,
+      "agility": 2,
+      "mind": 14,
+      "spirit": 10
+    },
+    "signing_bonus": 160,
+    "wage_per_year": 40,
+    "contract_years": 4,
+    "specialty": "Seer"
+  }
+]

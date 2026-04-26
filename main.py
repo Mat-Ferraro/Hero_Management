@@ -26,14 +26,15 @@ def main_menu() -> None:
     print("3. Sign hero")
     print("4. View inventory")
     print("5. Equip item")
-    print("6. Choose dungeon and raid")
-    print("7. View retired heroes")
-    print("8. View fallen heroes")
-    print("9. View class rules")
-    print("10. View manager reputation")
-    print("11. Save game")
-    print("12. Load game")
-    print("13. Quit")
+    print("6. Sell item")
+    print("7. Choose dungeon and raid")
+    print("8. View retired heroes")
+    print("9. View fallen heroes")
+    print("10. View class rules")
+    print("11. View manager reputation")
+    print("12. Save game")
+    print("13. Load game")
+    print("14. Quit")
     print("\nTip: type 'exit', 'quit', or 'q' at most prompts to close the game.")
 
 
@@ -151,6 +152,12 @@ def equip_item(state: GameState) -> None:
         return
 
     hero = state.roster[hero_choice - 1]
+
+    if not item.can_equip(hero.hero_class):
+        allowed = ', '.join(item.class_restrictions)
+        print(f"{hero.name} cannot equip {item.name}. Allowed classes: {allowed}.")
+        return
+
     old_item = hero.equipment.get(item.slot)
     hero.equipment[item.slot] = item
     state.inventory.pop(item_choice - 1)
@@ -160,6 +167,28 @@ def equip_item(state: GameState) -> None:
         print(f"Equipped {item.name} to {hero.name}. Returned {old_item.name} to inventory.")
     else:
         print(f"Equipped {item.name} to {hero.name}.")
+
+
+def sell_item(state: GameState) -> None:
+    if not state.inventory:
+        print("No items to sell.")
+        return
+
+    view_inventory(state)
+    item_choice = get_choice("\nChoose item to sell or blank to cancel: ", 1, len(state.inventory))
+    if item_choice is None:
+        return
+
+    item = state.inventory[item_choice - 1]
+    sell_value = max(1, item.value)
+    confirm = checked_input(f"Sell {item.name} for {sell_value}g? [y/N]: ").lower()
+
+    if confirm != "y":
+        return
+
+    state.inventory.pop(item_choice - 1)
+    state.gold += sell_value
+    print(success(f"Sold {item.name} for {sell_value}g."))
 
 
 def choose_dungeon_and_raid(state: GameState) -> None:
@@ -320,7 +349,7 @@ def run_game() -> None:
         print_header(state)
         main_menu()
 
-        choice = get_choice("Choose an action: ", 1, 13)
+        choice = get_choice("Choose an action: ", 1, 14)
         if choice is None:
             continue
 
@@ -335,22 +364,24 @@ def run_game() -> None:
         elif choice == 5:
             equip_item(state)
         elif choice == 6:
-            choose_dungeon_and_raid(state)
+            sell_item(state)
         elif choice == 7:
-            view_retired_heroes(state)
+            choose_dungeon_and_raid(state)
         elif choice == 8:
-            view_fallen_heroes(state)
+            view_retired_heroes(state)
         elif choice == 9:
-            view_class_rules()
+            view_fallen_heroes(state)
         elif choice == 10:
-            view_manager_reputation(state)
+            view_class_rules()
         elif choice == 11:
-            save_current_game(state)
+            view_manager_reputation(state)
         elif choice == 12:
+            save_current_game(state)
+        elif choice == 13:
             loaded_state = load_saved_game()
             if loaded_state is not None:
                 state = loaded_state
-        elif choice == 13:
+        elif choice == 14:
             print("Thanks for playing.")
             break
 

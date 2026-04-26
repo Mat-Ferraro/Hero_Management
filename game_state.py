@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from data_loader import load_dungeons, load_heroes, load_items
 from hero_specialties import random_specialty_for_class
 from manager_reputation import ManagerReputation
 from models import Dungeon, Hero, Item
@@ -53,40 +54,15 @@ def create_hero(
 
 
 def create_initial_contracts() -> List[Hero]:
-    return [
-        create_hero("Brakka Ironjaw", "Warrior", 26, {"might": 8, "agility": 4, "mind": 2, "spirit": 5}, 80, 18, 6, "Guardian"),
-        create_hero("Old Garron", "Warrior", 44, {"might": 10, "agility": 3, "mind": 3, "spirit": 7}, 45, 12, 5, "Vanguard"),
-        create_hero("Sil Tanglefoot", "Rogue", 22, {"might": 4, "agility": 9, "mind": 4, "spirit": 3}, 75, 17, 6, "Treasure Hunter"),
-        create_hero("Vera Quickhand", "Rogue", 35, {"might": 5, "agility": 10, "mind": 5, "spirit": 4}, 100, 22, 5, "Boss Killer"),
-        create_hero("Sister Maela", "Cleric", 39, {"might": 3, "agility": 3, "mind": 7, "spirit": 9}, 95, 20, 7, "Life Cleric"),
-        create_hero("Brother Tor", "Cleric", 58, {"might": 3, "agility": 2, "mind": 9, "spirit": 11}, 120, 28, 4, "Grave Cleric"),
-        create_hero("Nim the Unready", "Mage", 19, {"might": 1, "agility": 3, "mind": 8, "spirit": 5}, 60, 15, 8, "Scholar"),
-        create_hero("Archmage Pell", "Mage", 72, {"might": 1, "agility": 2, "mind": 14, "spirit": 10}, 160, 40, 4, "Seer"),
-    ]
+    return load_heroes()
 
 
 def create_dungeons() -> List[Dungeon]:
-    return [
-        Dungeon("Goblin Toll Caves", 1, 1, 2, 45, 90, 170, 55, 0.07, 0.015, 0.005, 0.25),
-        Dungeon("Crypt of Wet Bones", 2, 2, 3, 80, 180, 330, 90, 0.11, 0.035, 0.012, 0.35),
-        Dungeon("Bandit King's Vault", 3, 3, 4, 125, 330, 560, 145, 0.15, 0.06, 0.025, 0.45),
-        Dungeon("Ash Dragon Hatchery", 4, 5, 5, 185, 650, 1050, 240, 0.20, 0.09, 0.045, 0.60),
-    ]
+    return load_dungeons()
 
 
 def create_item_pool() -> List[Item]:
-    return [
-        Item("Rusty Longsword", "weapon", {"might": 2}, 60),
-        Item("Knight's Axe", "weapon", {"might": 4}, 150),
-        Item("Balanced Dagger", "weapon", {"agility": 3}, 100),
-        Item("Shadow Bow", "weapon", {"agility": 5}, 220),
-        Item("Apprentice Wand", "weapon", {"mind": 3}, 110),
-        Item("Elder Staff", "weapon", {"mind": 5, "spirit": 2}, 300),
-        Item("Blessed Charm", "trinket", {"spirit": 3}, 120),
-        Item("War Banner", "trinket", {"might": 1, "spirit": 2}, 140),
-        Item("Quickstep Boots", "boots", {"agility": 2}, 75),
-        Item("Scholar's Ring", "trinket", {"mind": 2}, 90),
-    ]
+    return load_items()
 
 
 def create_game() -> GameState:

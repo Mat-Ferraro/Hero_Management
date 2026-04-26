@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from combat_types import damage_type_for_hero
 from hero_specialties import specialty_description
 
 
@@ -53,10 +54,37 @@ class Item:
     slot: str
     stat_bonuses: Dict[str, int]
     value: int
+    rarity: str = "Common"
+    damage_type_bonus: Dict[str, float] = field(default_factory=dict)
+    enemy_type_bonus: Dict[str, float] = field(default_factory=dict)
+    enemy_type_resistance: Dict[str, float] = field(default_factory=dict)
+    class_restrictions: List[str] = field(default_factory=list)
+    enemy_affinity: List[str] = field(default_factory=list)
+
+    def can_equip(self, hero_class: str) -> bool:
+        return not self.class_restrictions or hero_class in self.class_restrictions
 
     def display(self) -> str:
-        bonuses = ", ".join(f"+{value} {stat}" for stat, value in self.stat_bonuses.items())
-        return f"{self.name} [{self.slot}] ({bonuses}) - value {self.value}g"
+        parts = []
+
+        if self.stat_bonuses:
+            parts.append(", ".join(f"+{value} {stat}" for stat, value in self.stat_bonuses.items()))
+
+        if self.damage_type_bonus:
+            parts.append(", ".join(f"+{int(value * 100)}% {damage} damage" for damage, value in self.damage_type_bonus.items()))
+
+        if self.enemy_type_bonus:
+            parts.append(", ".join(f"+{int(value * 100)}% vs {enemy}" for enemy, value in self.enemy_type_bonus.items()))
+
+        if self.enemy_type_resistance:
+            parts.append(", ".join(f"-{int(value * 100)}% dmg from {enemy}" for enemy, value in self.enemy_type_resistance.items()))
+
+        restrictions = ""
+        if self.class_restrictions:
+            restrictions = f" | Classes: {', '.join(self.class_restrictions)}"
+
+        detail = "; ".join(parts) if parts else "No bonuses"
+        return f"{self.name} [{self.rarity} {self.slot}] ({detail}) - value {self.value}g{restrictions}"
 
 
 @dataclass
@@ -126,6 +154,9 @@ class Hero:
         general = sum(self.total_stat(stat) for stat in STAT_NAMES)
         injury_penalty = 0.65 if self.injured_years_remaining > 0 else 1.0
         return max(1, int((primary + secondary + general + self.level * 5) * injury_penalty))
+
+    def damage_type(self) -> str:
+        return damage_type_for_hero(self)
 
     def xp_to_next_level(self) -> int:
         return 100 + (self.level - 1) * 60
@@ -284,7 +315,7 @@ class Hero:
             hp_text = f"HP {self.current_health}/{self.max_health()} {self.health_status()}"
 
         return (
-            f"{self.name} | {self.hero_class} ({self.specialty}) | Age {self.age} | Lv {self.level} | "
+            f"{self.name} | {self.hero_class} ({self.specialty}) | {self.damage_type()} | Age {self.age} | Lv {self.level} | "
             f"Power {self.combat_power()} | {hp_text} | Contract {self.contract_years}y | "
             f"Wage {self.wage_per_year}g/y{debt_text}{survivor_text}{injury}"
         )
@@ -304,6 +335,7 @@ class Hero:
         return (
             f"{self.display_short()}\n"
             f"  Specialty: {self.specialty} - {specialty_description(self.specialty)}\n"
+            f"  Damage Type: {self.damage_type()}\n"
             f"  XP: {self.xp}/{self.xp_to_next_level()}\n"
             f"  Stats: {stat_text}\n"
             f"  Equipment: {equipped}\n"
@@ -327,10 +359,17 @@ class Dungeon:
     mortal_wound_chance: float
     death_chance: float
     item_drop_chance: float
+    enemy_type: str = "Beasts"
 
     @property
     def room_count(self) -> int:
         return self.years_to_complete
+
+    def enemy_type_for_room(self, room_type: str) -> str:
+        if room_type == "Event":
+            import random
+            return random.choice([self.enemy_type, "Spirits", "Bandits", "Beasts"])
+        return self.enemy_type
 
     def room_enemy_power(self, room_number: int, room_type: str) -> int:
         type_multiplier = {
@@ -347,7 +386,7 @@ class Dungeon:
 
     def display(self) -> str:
         return (
-            f"{self.name} | Difficulty {self.difficulty} | {self.years_to_complete} year(s) | "
+            f"{self.name} | {self.enemy_type} | Difficulty {self.difficulty} | {self.years_to_complete} year(s) | "
             f"{self.room_count} room(s) | Base Enemy Power {self.enemy_power} | "
             f"Loot {self.loot_min}-{self.loot_max}g | XP {self.xp_reward}"
         )
