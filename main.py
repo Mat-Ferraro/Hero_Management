@@ -10,7 +10,13 @@ from battle_simulator import (
 from game_state import GameState, create_game
 from models import CLASS_RULES
 from save_system import DEFAULT_SAVE_PATH, load_game, save_exists, save_game
-from ui import bold, danger, pad_col, success, warning
+from table_display import (
+    print_compact_legacy_hero_table,
+    print_dungeon_table,
+    print_hero_table,
+    print_inventory_table,
+)
+from ui import danger, success, warning
 
 
 def print_header(state: GameState) -> None:
@@ -50,11 +56,11 @@ def get_choice(prompt: str, minimum: int, maximum: int):
     try:
         value = int(raw)
     except ValueError:
-        print("Please enter a number.")
+        print(warning("Please enter a number."))
         return None
 
     if value < minimum or value > maximum:
-        print(f"Please enter a number from {minimum} to {maximum}.")
+        print(warning(f"Please enter a number from {minimum} to {maximum}."))
         return None
 
     return value
@@ -71,59 +77,23 @@ def view_roster(state: GameState) -> None:
     print("\n=== Roster ===")
 
     if not state.roster:
-        print("No heroes signed yet.")
+        print(warning("No heroes signed yet."))
         return
 
     print(f"Total wage bill per year: {sum(hero.wage_per_year for hero in state.roster)}g")
     print(f"Total outstanding debt: {sum(hero.debt for hero in state.roster)}g")
     print(f"Pending bereavement payments: {sum(payment.amount for payment in state.pending_bereavement_payments)}g")
-
-    for index, hero in enumerate(state.roster, start=1):
-        print(f"\n{index}. {hero.display_full()}")
-
-
-def contract_table_columns() -> list[str]:
-    return [
-        pad_col("#", 4),
-        pad_col("Name", 18),
-        pad_col("Class", 8),
-        pad_col("Specialty", 16),
-        pad_col("Damage", 8),
-        pad_col("Growth", 9),
-        pad_col("Terms", 10),
-        pad_col("Age", 3, align="right"),
-        pad_col("Lv", 5),
-        pad_col("Pwr", 5, align="right"),
-        pad_col("HP", 9, align="right"),
-        pad_col("Status", 17),
-        pad_col("Ct", 4, align="right"),
-        pad_col("Wage", 12, align="right"),
-        pad_col("Signing", 14, align="right"),
-        pad_col("Total", 15, align="right"),
-    ]
-
-
-def contract_table_header() -> str:
-    return bold(" | ".join(contract_table_columns()))
-
-
-def contract_table_separator() -> str:
-    return "-" * len(" | ".join(contract_table_columns()))
-
+    print_hero_table(state.roster, include_money=False)
 
 
 def view_contracts(state: GameState) -> None:
     print("\n=== Available Contracts ===")
 
     if not state.available_contracts:
-        print("No available contracts.")
+        print(warning("No available contracts."))
         return
 
-    print(contract_table_header())
-    print(contract_table_separator())
-
-    for index, hero in enumerate(state.available_contracts, start=1):
-        print(f"{pad_col(str(index) + '.', 4)} | {hero.display_contract()}")
+    print_hero_table(state.available_contracts, include_money=True)
 
 
 def sign_hero(state: GameState) -> None:
@@ -139,34 +109,33 @@ def sign_hero(state: GameState) -> None:
     hero = state.available_contracts[choice - 1]
 
     if state.gold < hero.signing_bonus:
-        print(f"Not enough gold. Need {hero.signing_bonus}g for the signing bonus.")
+        print(danger(f"Not enough gold. Need {hero.signing_bonus}g for the signing bonus."))
         return
 
     state.gold -= hero.signing_bonus
     state.roster.append(hero)
     state.available_contracts.pop(choice - 1)
 
-    print(f"Signed {hero.name}. Paid {hero.signing_bonus}g. Wage: {hero.wage_per_year}g/year.")
+    print(success(f"Signed {hero.name}. Paid {hero.signing_bonus}g. Wage: {hero.wage_per_year}g/year."))
 
 
 def view_inventory(state: GameState) -> None:
     print("\n=== Inventory ===")
 
     if not state.inventory:
-        print("No items yet.")
+        print(warning("No items yet."))
         return
 
-    for index, item in enumerate(state.inventory, start=1):
-        print(f"{index}. {item.display()}")
+    print_inventory_table(state.inventory)
 
 
 def equip_item(state: GameState) -> None:
     if not state.roster:
-        print("You need heroes before equipping items.")
+        print(warning("You need heroes before equipping items."))
         return
 
     if not state.inventory:
-        print("No items to equip.")
+        print(warning("No items to equip."))
         return
 
     view_inventory(state)
@@ -177,8 +146,7 @@ def equip_item(state: GameState) -> None:
     item = state.inventory[item_choice - 1]
 
     print("\nChoose hero:")
-    for index, hero in enumerate(state.roster, start=1):
-        print(f"{index}. {hero.display_short()}")
+    print_hero_table(state.roster, include_money=False)
 
     hero_choice = get_choice("Hero number or blank to cancel: ", 1, len(state.roster))
     if hero_choice is None:
@@ -187,8 +155,8 @@ def equip_item(state: GameState) -> None:
     hero = state.roster[hero_choice - 1]
 
     if not item.can_equip(hero.hero_class):
-        allowed = ', '.join(item.class_restrictions)
-        print(f"{hero.name} cannot equip {item.name}. Allowed classes: {allowed}.")
+        allowed = ", ".join(item.class_restrictions)
+        print(danger(f"{hero.name} cannot equip {item.name}. Allowed classes: {allowed}."))
         return
 
     old_item = hero.equipment.get(item.slot)
@@ -197,14 +165,14 @@ def equip_item(state: GameState) -> None:
 
     if old_item:
         state.inventory.append(old_item)
-        print(f"Equipped {item.name} to {hero.name}. Returned {old_item.name} to inventory.")
+        print(success(f"Equipped {item.name} to {hero.name}. Returned {old_item.name} to inventory."))
     else:
-        print(f"Equipped {item.name} to {hero.name}.")
+        print(success(f"Equipped {item.name} to {hero.name}."))
 
 
 def sell_item(state: GameState) -> None:
     if not state.inventory:
-        print("No items to sell.")
+        print(warning("No items to sell."))
         return
 
     view_inventory(state)
@@ -226,7 +194,7 @@ def sell_item(state: GameState) -> None:
 
 def choose_dungeon_and_raid(state: GameState) -> None:
     if not state.roster:
-        print("You need to sign heroes before raiding dungeons.")
+        print(warning("You need to sign heroes before raiding dungeons."))
         return
 
     total_debt = sum(hero.debt for hero in state.roster)
@@ -242,13 +210,7 @@ def choose_dungeon_and_raid(state: GameState) -> None:
     print(f"Pending bereavement payments: {total_bereavement}g.")
 
     print("\n=== Dungeons ===")
-    for index, dungeon in enumerate(state.dungeons, start=1):
-        projected_full_wages = total_wage_per_year * dungeon.room_count
-        print(
-            f"{index}. {dungeon.display()} | "
-            f"Required Before Start: {total_debt}g debt clearance | "
-            f"Projected Full Wages Over Route: {projected_full_wages}g"
-        )
+    print_dungeon_table(state.dungeons, total_debt=total_debt, wage_per_year=total_wage_per_year)
 
     dungeon_choice = get_choice("\nChoose dungeon or blank to cancel: ", 1, len(state.dungeons))
     if dungeon_choice is None:
@@ -276,8 +238,7 @@ def choose_dungeon_and_raid(state: GameState) -> None:
         return
 
     print("\nAvailable heroes:")
-    for index, hero in enumerate(available_heroes, start=1):
-        print(f"{index}. {hero.display_short()}")
+    print_hero_table(available_heroes, include_money=False)
 
     print("\nEnter up to 4 hero numbers separated by commas. Example: 1,2,3")
     raw_party = checked_input("Party: ")
@@ -287,17 +248,17 @@ def choose_dungeon_and_raid(state: GameState) -> None:
     try:
         selected_indexes = [int(value.strip()) for value in raw_party.split(",") if value.strip()]
     except ValueError:
-        print("Invalid party selection.")
+        print(danger("Invalid party selection."))
         return
 
     if not selected_indexes or len(selected_indexes) > 4 or len(set(selected_indexes)) != len(selected_indexes):
-        print("Party must include 1 to 4 unique heroes.")
+        print(warning("Party must include 1 to 4 unique heroes."))
         return
 
     party = []
     for index in selected_indexes:
         if index < 1 or index > len(available_heroes):
-            print("Invalid hero number.")
+            print(danger("Invalid hero number."))
             return
         party.append(available_heroes[index - 1])
 
@@ -309,22 +270,20 @@ def view_retired_heroes(state: GameState) -> None:
     print("\n=== Retired Heroes ===")
 
     if not state.retired_heroes:
-        print("No retired heroes yet.")
+        print(warning("No retired heroes yet."))
         return
 
-    for index, hero in enumerate(state.retired_heroes, start=1):
-        print(f"{index}. {hero.name} | {hero.hero_class} | Retired Age {hero.age} | Lv {hero.level}")
+    print_compact_legacy_hero_table(state.retired_heroes, label="Retired")
 
 
 def view_fallen_heroes(state: GameState) -> None:
     print("\n=== Fallen Heroes ===")
 
     if not state.fallen_heroes:
-        print("No fallen heroes yet.")
+        print(warning("No fallen heroes yet."))
         return
 
-    for index, hero in enumerate(state.fallen_heroes, start=1):
-        print(f"{index}. {hero.name} | {hero.hero_class} | Died Age {hero.age} | Lv {hero.level}")
+    print_compact_legacy_hero_table(state.fallen_heroes, label="Fallen")
 
 
 def view_class_rules() -> None:
@@ -415,7 +374,7 @@ def run_game() -> None:
             if loaded_state is not None:
                 state = loaded_state
         elif choice == 14:
-            print("Thanks for playing.")
+            print(success("Thanks for playing."))
             break
 
 
