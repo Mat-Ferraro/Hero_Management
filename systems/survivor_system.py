@@ -2,6 +2,7 @@ import random
 from typing import List
 
 from game_state import GameState
+from growth_rates import random_growth_rate
 from hero_specialties import apply_life_cleric_healing, random_specialty_for_class
 from manager_reputation import reputation_for_survivor_rescued
 from models import Dungeon, Hero
@@ -46,8 +47,10 @@ def create_survivor(dungeon: Dungeon) -> Hero:
         wage_per_year=0,
         contract_years=0,
         specialty=random_specialty_for_class(survivor_class),
+        growth_rate=random_growth_rate(),
         is_temporary_survivor=True,
     )
+
     survivor.reset_health_for_expedition()
 
     missing_health = random.randint(5, max(10, survivor.max_health() // 3))
@@ -55,13 +58,17 @@ def create_survivor(dungeon: Dungeon) -> Hero:
 
     return survivor
 
+
 def resolve_survivor_room(party: List[Hero], dungeon: Dungeon) -> RoomResolution:
     survivor = create_survivor(dungeon)
     party.append(survivor)
 
     messages = [
         highlight("The party finds a stranded survivor hiding among the ruins."),
-        success(f"{survivor.name}, a {survivor.hero_class} {survivor.specialty}, joins for the rest of the dungeon."),
+        success(
+            f"{survivor.name}, a {survivor.hero_class} {survivor.specialty} "
+            f"with {survivor.growth_rate} growth, joins for the rest of the dungeon."
+        ),
         info(f"{survivor.name} requires no wages and will leave after the expedition."),
         info(f"Survivor Status: {survivor.display_short()}"),
     ]
@@ -69,13 +76,16 @@ def resolve_survivor_room(party: List[Hero], dungeon: Dungeon) -> RoomResolution
     messages.extend(apply_life_cleric_healing(party))
     return RoomResolution(messages=messages, loot=0, xp=0)
 
+
 def remove_temporary_survivors_from_party(state: GameState, party: List[Hero]) -> List[str]:
     messages = []
+
     for hero in list(party):
         if hero.is_temporary_survivor:
             party.remove(hero)
+
             if hero.current_health and hero.current_health > 0:
                 messages.append(info(f"{hero.name} parts ways with the guild after the expedition."))
                 messages.extend(reputation_for_survivor_rescued(state.reputation))
-    return messages
 
+    return messages

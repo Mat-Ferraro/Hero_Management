@@ -12,7 +12,8 @@
     "signing_bonus": 80,
     "wage_per_year": 18,
     "contract_years": 6,
-    "specialty": "Guardian"
+    "specialty": "Guardian",
+    "growth_rate": "Gifted"
   },
   {
     "name": "Old Garron",
@@ -27,7 +28,8 @@
     "signing_bonus": 45,
     "wage_per_year": 12,
     "contract_years": 5,
-    "specialty": "Vanguard"
+    "specialty": "Vanguard",
+    "growth_rate": "Mundane"
   },
   {
     "name": "Sil Tanglefoot",
@@ -42,7 +44,8 @@
     "signing_bonus": 75,
     "wage_per_year": 17,
     "contract_years": 6,
-    "specialty": "Treasure Hunter"
+    "specialty": "Treasure Hunter",
+    "growth_rate": "Heroic"
   },
   {
     "name": "Vera Quickhand",
@@ -57,7 +60,8 @@
     "signing_bonus": 100,
     "wage_per_year": 22,
     "contract_years": 5,
-    "specialty": "Boss Killer"
+    "specialty": "Boss Killer",
+    "growth_rate": "Gifted"
   },
   {
     "name": "Sister Maela",
@@ -72,7 +76,8 @@
     "signing_bonus": 95,
     "wage_per_year": 20,
     "contract_years": 7,
-    "specialty": "Life Cleric"
+    "specialty": "Life Cleric",
+    "growth_rate": "Talented"
   },
   {
     "name": "Brother Tor",
@@ -87,7 +92,8 @@
     "signing_bonus": 120,
     "wage_per_year": 28,
     "contract_years": 4,
-    "specialty": "Grave Cleric"
+    "specialty": "Grave Cleric",
+    "growth_rate": "Mundane"
   },
   {
     "name": "Nim the Unready",
@@ -102,7 +108,8 @@
     "signing_bonus": 60,
     "wage_per_year": 15,
     "contract_years": 8,
-    "specialty": "Scholar"
+    "specialty": "Scholar",
+    "growth_rate": "Legendary"
   },
   {
     "name": "Archmage Pell",
@@ -117,6 +124,7 @@
     "signing_bonus": 160,
     "wage_per_year": 40,
     "contract_years": 4,
-    "specialty": "Seer"
+    "specialty": "Seer",
+    "growth_rate": "Heroic"
   }
 ]

@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from combat_types import damage_type_for_hero
+from growth_rates import growth_description, growth_multiplier
 from hero_specialties import specialty_description
 from .class_rules import CLASS_RULES, STAT_NAMES
 from .item import Item
@@ -19,6 +20,7 @@ class Hero:
     wage_per_year: int
     contract_years: int
     specialty: str = "Adventurer"
+    growth_rate: str = "Talented"
     equipment: Dict[str, Item] = field(default_factory=dict)
     injured_years_remaining: int = 0
     wound_history: List[str] = field(default_factory=list)
@@ -78,6 +80,9 @@ class Hero:
     def damage_type(self) -> str:
         return damage_type_for_hero(self)
 
+    def growth_multiplier(self) -> float:
+        return growth_multiplier(self.growth_rate)
+
     def xp_to_next_level(self) -> int:
         return 100 + (self.level - 1) * 60
 
@@ -107,7 +112,7 @@ class Hero:
                 multiplier = 0.95
             else:
                 multiplier = 0.75
-        return max(1, int(base_xp * multiplier))
+        return max(1, int(base_xp * multiplier * self.growth_multiplier()))
 
     def level_up(self) -> List[str]:
         import random
@@ -235,7 +240,7 @@ class Hero:
             hp_text = f"HP {self.current_health}/{self.max_health()} {self.health_status()}"
 
         return (
-            f"{self.name} | {self.hero_class} ({self.specialty}) | {self.damage_type()} | Age {self.age} | Lv {self.level} | "
+            f"{self.name} | {self.hero_class} ({self.specialty}) | {self.damage_type()} | Growth {self.growth_rate} | Age {self.age} | Lv {self.level} | "
             f"Power {self.combat_power()} | {hp_text} | Contract {self.contract_years}y | "
             f"Wage {self.wage_per_year}g/y{debt_text}{survivor_text}{injury}"
         )
@@ -255,6 +260,7 @@ class Hero:
         return (
             f"{self.display_short()}\n"
             f"  Specialty: {self.specialty} - {specialty_description(self.specialty)}\n"
+            f"  Growth Rate: {self.growth_rate} (x{self.growth_multiplier():.2f}) - {growth_description(self.growth_rate)}\n"
             f"  Damage Type: {self.damage_type()}\n"
             f"  XP: {self.xp}/{self.xp_to_next_level()}\n"
             f"  Stats: {stat_text}\n"

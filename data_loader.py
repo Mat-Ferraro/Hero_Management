@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import List
 
+from growth_rates import random_growth_rate
 from hero_specialties import random_specialty_for_class
 from models import Dungeon, Hero, Item
 
@@ -35,6 +36,7 @@ def hero_from_data(data: dict) -> Hero:
         wage_per_year=int(data["wage_per_year"]),
         contract_years=int(data["contract_years"]),
         specialty=data.get("specialty") or random_specialty_for_class(hero_class),
+        growth_rate=data.get("growth_rate") or random_growth_rate(),
     )
 
 
