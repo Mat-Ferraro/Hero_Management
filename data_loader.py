@@ -10,6 +10,7 @@ DATA_DIR = Path("data")
 HEROES_PATH = DATA_DIR / "heroes.json"
 DUNGEONS_PATH = DATA_DIR / "dungeons.json"
 ITEMS_PATH = DATA_DIR / "items.json"
+EVENTS_PATH = DATA_DIR / "events.json"
 
 
 def load_json_file(path: Path):
@@ -80,3 +81,11 @@ def load_items() -> List[Item]:
 
 def load_dungeons() -> List[Dungeon]:
     return [dungeon_from_data(dungeon_data) for dungeon_data in load_json_file(DUNGEONS_PATH)]
+
+
+
+def load_events() -> list:
+    if not EVENTS_PATH.exists():
+        return []
+
+    return load_json_file(EVENTS_PATH)

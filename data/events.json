@@ -1,0 +1,154 @@
+[
+  {
+    "name": "Rescue Survivor",
+    "description": "A wounded adventurer is trapped behind collapsed stone.",
+    "enemy_types": [
+      "Beasts",
+      "Bandits",
+      "Undead",
+      "Spirits",
+      "Demons",
+      "Dragons"
+    ],
+    "choices": [
+      {
+        "label": "Risk time and resources to rescue them",
+        "outcome": "survivor",
+        "reputation": {
+          "overall": 1,
+          "safety": 1,
+          "protector": 2
+        },
+        "message": "The guild risks danger to save a stranger."
+      },
+      {
+        "label": "Leave them behind and keep moving",
+        "outcome": "nothing",
+        "reputation": {
+          "protector": -2,
+          "safety": -1
+        },
+        "message": "The party leaves the survivor behind."
+      }
+    ]
+  },
+  {
+    "name": "Cursed Shrine",
+    "description": "A shrine pulses with unstable power.",
+    "enemy_types": [
+      "Undead",
+      "Spirits",
+      "Demons"
+    ],
+    "choices": [
+      {
+        "label": "Purify the shrine",
+        "outcome": "heal",
+        "reputation": {
+          "overall": 1,
+          "safety": 1,
+          "cleric": 1
+        },
+        "message": "The shrine is purified and releases restorative light."
+      },
+      {
+        "label": "Take its power",
+        "outcome": "cursed_power",
+        "reputation": {
+          "overall": -1,
+          "safety": -2
+        },
+        "message": "The party draws dangerous power from the shrine."
+      }
+    ]
+  },
+  {
+    "name": "Hidden Armory",
+    "description": "A sealed armory lies behind an old mechanism.",
+    "enemy_types": [
+      "Bandits",
+      "Dragons",
+      "Demons",
+      "Beasts"
+    ],
+    "choices": [
+      {
+        "label": "Search carefully",
+        "outcome": "item",
+        "reputation": {
+          "safety": 1
+        },
+        "message": "The party takes its time and searches carefully."
+      },
+      {
+        "label": "Force it open quickly",
+        "outcome": "trap_and_loot",
+        "reputation": {
+          "safety": -1
+        },
+        "message": "The party forces the armory open, triggering old defenses."
+      }
+    ]
+  },
+  {
+    "name": "Rival Party",
+    "description": "A rival adventuring party is weakened but carrying supplies.",
+    "enemy_types": [
+      "Bandits",
+      "Beasts",
+      "Undead",
+      "Spirits",
+      "Demons",
+      "Dragons"
+    ],
+    "choices": [
+      {
+        "label": "Help them regroup",
+        "outcome": "reputation",
+        "reputation": {
+          "overall": 2,
+          "reliability": 1,
+          "protector": 1
+        },
+        "message": "The guild earns respect by aiding rivals."
+      },
+      {
+        "label": "Rob them for supplies",
+        "outcome": "loot",
+        "reputation": {
+          "overall": -2,
+          "reliability": -2,
+          "protector": -2
+        },
+        "message": "The guild takes supplies by force."
+      }
+    ]
+  },
+  {
+    "name": "Spirit Bargain",
+    "description": "A spirit offers knowledge in exchange for pain.",
+    "enemy_types": [
+      "Spirits",
+      "Undead"
+    ],
+    "choices": [
+      {
+        "label": "Accept the bargain",
+        "outcome": "xp_and_wound",
+        "reputation": {
+          "development": 1,
+          "safety": -1
+        },
+        "message": "The party accepts painful forbidden knowledge."
+      },
+      {
+        "label": "Refuse and move on",
+        "outcome": "nothing",
+        "reputation": {
+          "safety": 1
+        },
+        "message": "The party refuses the spirit's bargain."
+      }
+    ]
+  }
+]
