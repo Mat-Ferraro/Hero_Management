@@ -1,0 +1,138 @@
+{
+  "market_size": 8,
+  "classes": {
+    "Warrior": {
+      "age_min": 18,
+      "age_max": 52,
+      "stat_ranges": {
+        "might": [
+          6,
+          12
+        ],
+        "agility": [
+          2,
+          7
+        ],
+        "mind": [
+          1,
+          5
+        ],
+        "spirit": [
+          3,
+          8
+        ]
+      },
+      "level_weights": {
+        "1": 60,
+        "2": 24,
+        "3": 11,
+        "4": 4,
+        "5": 1
+      }
+    },
+    "Rogue": {
+      "age_min": 18,
+      "age_max": 55,
+      "stat_ranges": {
+        "might": [
+          3,
+          8
+        ],
+        "agility": [
+          6,
+          13
+        ],
+        "mind": [
+          2,
+          7
+        ],
+        "spirit": [
+          2,
+          6
+        ]
+      },
+      "level_weights": {
+        "1": 62,
+        "2": 24,
+        "3": 10,
+        "4": 3,
+        "5": 1
+      }
+    },
+    "Cleric": {
+      "age_min": 22,
+      "age_max": 70,
+      "stat_ranges": {
+        "might": [
+          2,
+          6
+        ],
+        "agility": [
+          1,
+          5
+        ],
+        "mind": [
+          5,
+          11
+        ],
+        "spirit": [
+          6,
+          14
+        ]
+      },
+      "level_weights": {
+        "1": 58,
+        "2": 25,
+        "3": 12,
+        "4": 4,
+        "5": 1
+      }
+    },
+    "Mage": {
+      "age_min": 18,
+      "age_max": 88,
+      "stat_ranges": {
+        "might": [
+          1,
+          4
+        ],
+        "agility": [
+          1,
+          5
+        ],
+        "mind": [
+          7,
+          15
+        ],
+        "spirit": [
+          4,
+          11
+        ]
+      },
+      "level_weights": {
+        "1": 55,
+        "2": 26,
+        "3": 13,
+        "4": 5,
+        "5": 1
+      }
+    }
+  },
+  "contract_years": {
+    "min": 2,
+    "max": 7
+  },
+  "pricing": {
+    "signing_base": 25,
+    "signing_power_multiplier": 2.2,
+    "signing_level_multiplier": 35,
+    "wage_base": 6,
+    "wage_power_multiplier": 0.35,
+    "wage_level_multiplier": 5,
+    "young_premium_age": 24,
+    "young_premium": 1.1,
+    "old_discount_age": 55,
+    "old_discount": 0.8,
+    "injury_discount": 0.7
+  }
+}

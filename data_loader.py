@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import List
 
+from contract_attitudes import random_contract_attitude
 from growth_rates import random_growth_rate
 from hero_specialties import random_specialty_for_class
 from models import Dungeon, Hero, Item
@@ -12,6 +13,8 @@ HEROES_PATH = DATA_DIR / "heroes.json"
 DUNGEONS_PATH = DATA_DIR / "dungeons.json"
 ITEMS_PATH = DATA_DIR / "items.json"
 EVENTS_PATH = DATA_DIR / "events.json"
+HERO_NAMES_PATH = DATA_DIR / "hero_names.json"
+HERO_GENERATION_RULES_PATH = DATA_DIR / "hero_generation_rules.json"
 
 
 def load_json_file(path: Path):
@@ -37,6 +40,7 @@ def hero_from_data(data: dict) -> Hero:
         contract_years=int(data["contract_years"]),
         specialty=data.get("specialty") or random_specialty_for_class(hero_class),
         growth_rate=data.get("growth_rate") or random_growth_rate(),
+        contract_attitude=data.get("contract_attitude") or random_contract_attitude(),
     )
 
 
@@ -91,3 +95,12 @@ def load_events() -> list:
         return []
 
     return load_json_file(EVENTS_PATH)
+
+
+
+def load_hero_names() -> dict:
+    return load_json_file(HERO_NAMES_PATH)
+
+
+def load_hero_generation_rules() -> dict:
+    return load_json_file(HERO_GENERATION_RULES_PATH)

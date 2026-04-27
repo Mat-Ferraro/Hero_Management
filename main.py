@@ -10,7 +10,7 @@ from battle_simulator import (
 from game_state import GameState, create_game
 from models import CLASS_RULES
 from save_system import DEFAULT_SAVE_PATH, load_game, save_exists, save_game
-from ui import danger, success, warning
+from ui import bold, danger, pad_col, success, warning
 
 
 def print_header(state: GameState) -> None:
@@ -82,6 +82,36 @@ def view_roster(state: GameState) -> None:
         print(f"\n{index}. {hero.display_full()}")
 
 
+def contract_table_columns() -> list[str]:
+    return [
+        pad_col("#", 4),
+        pad_col("Name", 18),
+        pad_col("Class", 8),
+        pad_col("Specialty", 16),
+        pad_col("Damage", 8),
+        pad_col("Growth", 9),
+        pad_col("Terms", 10),
+        pad_col("Age", 3, align="right"),
+        pad_col("Lv", 5),
+        pad_col("Pwr", 5, align="right"),
+        pad_col("HP", 9, align="right"),
+        pad_col("Status", 17),
+        pad_col("Ct", 4, align="right"),
+        pad_col("Wage", 12, align="right"),
+        pad_col("Signing", 14, align="right"),
+        pad_col("Total", 15, align="right"),
+    ]
+
+
+def contract_table_header() -> str:
+    return bold(" | ".join(contract_table_columns()))
+
+
+def contract_table_separator() -> str:
+    return "-" * len(" | ".join(contract_table_columns()))
+
+
+
 def view_contracts(state: GameState) -> None:
     print("\n=== Available Contracts ===")
 
@@ -89,8 +119,11 @@ def view_contracts(state: GameState) -> None:
         print("No available contracts.")
         return
 
+    print(contract_table_header())
+    print(contract_table_separator())
+
     for index, hero in enumerate(state.available_contracts, start=1):
-        print(f"{index}. {hero.display_contract()}")
+        print(f"{pad_col(str(index) + '.', 4)} | {hero.display_contract()}")
 
 
 def sign_hero(state: GameState) -> None:

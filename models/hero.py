@@ -3,9 +3,11 @@ from typing import Dict, List, Optional
 
 from combat_types import damage_type_for_hero
 from growth_rates import growth_description, growth_multiplier
+from contract_attitudes import attitude_description
 from hero_specialties import specialty_description
 from .class_rules import CLASS_RULES, STAT_NAMES
 from .item import Item
+from ui import Color, color_health_status, pad_col, warning
 
 
 @dataclass
@@ -21,6 +23,7 @@ class Hero:
     contract_years: int
     specialty: str = "Adventurer"
     growth_rate: str = "Talented"
+    contract_attitude: str = "Practical"
     equipment: Dict[str, Item] = field(default_factory=dict)
     injured_years_remaining: int = 0
     wound_history: List[str] = field(default_factory=list)
@@ -223,33 +226,136 @@ class Hero:
 
         return random.random() < self.retirement_chance()
 
-    def display_short(self) -> str:
-        survivor_text = " | TEMP SURVIVOR" if self.is_temporary_survivor else ""
+    def display_short(self, use_color: bool = True, include_money: bool = False) -> str:
+        survivor_text = "TEMP" if self.is_temporary_survivor else ""
 
-        injury = ""
+        injury_text = ""
         if self.injured_years_remaining > 0:
-            injury = f" INJURED {self.injured_years_remaining}y"
+            injury_text = f"INJ {self.injured_years_remaining}y"
 
         debt_text = ""
         if self.debt > 0:
-            debt_text = f" | Debt {self.debt}g"
+            debt_text = f"{self.debt}g"
 
         if self.current_health is None:
-            hp_text = f"HP {self.max_health()}/{self.max_health()}"
+            hp_text = f"{self.max_health()}/{self.max_health()}"
+            hp_status = "Healthy"
         else:
-            hp_text = f"HP {self.current_health}/{self.max_health()} {self.health_status()}"
+            hp_text = f"{self.current_health}/{self.max_health()}"
+            hp_status = self.health_status()
 
-        return (
-            f"{self.name} | {self.hero_class} ({self.specialty}) | {self.damage_type()} | Growth {self.growth_rate} | Age {self.age} | Lv {self.level} | "
-            f"Power {self.combat_power()} | {hp_text} | Contract {self.contract_years}y | "
-            f"Wage {self.wage_per_year}g/y{debt_text}{survivor_text}{injury}"
-        )
+        damage_text = self.damage_type()
+        wage_text = f"{self.wage_per_year}g/y"
 
-    def display_contract(self) -> str:
-        return (
-            f"{self.display_short()} | Signing {self.signing_bonus}g | "
-            f"Total Value {self.total_contract_value()}g"
-        )
+        class_col = None
+        damage_col = None
+        growth_col = None
+        terms_col = None
+        status_col = None
+        wage_col = None
+
+        if use_color:
+            class_col = {
+                "Warrior": Color.RED,
+                "Rogue": Color.GREEN,
+                "Cleric": Color.CYAN,
+                "Mage": Color.MAGENTA,
+            }.get(self.hero_class, Color.WHITE)
+
+            damage_col = {
+                "Physical": Color.YELLOW,
+                "Magic": Color.MAGENTA,
+                "Holy": Color.CYAN,
+            }.get(damage_text, Color.WHITE)
+
+            growth_col = {
+                "Mundane": Color.DIM,
+                "Talented": Color.WHITE,
+                "Gifted": Color.GREEN,
+                "Heroic": Color.CYAN,
+                "Legendary": Color.MAGENTA,
+                "Mythic": Color.RED,
+            }.get(self.growth_rate, Color.WHITE)
+
+            terms_col = {
+                "Modest": Color.GREEN,
+                "Practical": Color.WHITE,
+                "Ambitious": Color.YELLOW,
+                "Mercenary": Color.RED,
+                "Noble": Color.CYAN,
+            }.get(self.contract_attitude, Color.WHITE)
+
+            status_col = {
+                "DEAD": Color.RED,
+                "CRITICAL": Color.RED,
+                "WOUNDED": Color.YELLOW,
+                "HURT": Color.YELLOW,
+                "Healthy": Color.GREEN,
+            }.get(hp_status, Color.WHITE)
+
+            if self.wage_per_year >= 50:
+                wage_col = Color.RED
+            elif self.wage_per_year >= 30:
+                wage_col = Color.YELLOW
+            else:
+                wage_col = Color.GREEN
+
+        columns = [
+            pad_col(self.name, 18),
+            pad_col(self.hero_class, 8, class_col),
+            pad_col(self.specialty, 16),
+            pad_col(damage_text, 8, damage_col),
+            pad_col(self.growth_rate, 9, growth_col),
+            pad_col(self.contract_attitude, 10, terms_col),
+            pad_col(self.age, 3, align="right"),
+            pad_col(f"Lv {self.level}", 5),
+            pad_col(self.combat_power(), 5, align="right"),
+            pad_col(hp_text, 9, align="right"),
+            pad_col(hp_status, 17, status_col),
+            pad_col(f"{self.contract_years}y", 4, align="right"),
+            pad_col(wage_text, 12, wage_col, align="right"),
+        ]
+
+        if include_money:
+            signing_col = None
+            total_col = None
+
+            if use_color:
+                if self.signing_bonus >= 275:
+                    signing_col = Color.RED
+                elif self.signing_bonus >= 175:
+                    signing_col = Color.YELLOW
+                else:
+                    signing_col = Color.GREEN
+
+                total_value = self.total_contract_value()
+                if total_value >= 700:
+                    total_col = Color.RED
+                elif total_value >= 400:
+                    total_col = Color.YELLOW
+                else:
+                    total_col = Color.GREEN
+
+            columns.extend(
+                [
+                    pad_col(f"{self.signing_bonus}g", 14, signing_col, align="right"),
+                    pad_col(f"{self.total_contract_value()}g", 15, total_col, align="right"),
+                ]
+            )
+
+        if debt_text:
+            columns.append(pad_col(debt_text, 10, Color.RED if use_color else None))
+
+        if survivor_text:
+            columns.append(pad_col(survivor_text, 5))
+
+        if injury_text:
+            columns.append(pad_col(injury_text, 10, Color.YELLOW if use_color else None))
+
+        return " | ".join(columns)
+
+    def display_contract(self, use_color: bool = True) -> str:
+        return self.display_short(use_color=use_color, include_money=True)
 
     def display_full(self) -> str:
         stat_text = ", ".join(f"{stat}: {self.total_stat(stat)}" for stat in STAT_NAMES)
@@ -261,6 +367,7 @@ class Hero:
             f"{self.display_short()}\n"
             f"  Specialty: {self.specialty} - {specialty_description(self.specialty)}\n"
             f"  Growth Rate: {self.growth_rate} (x{self.growth_multiplier():.2f}) - {growth_description(self.growth_rate)}\n"
+            f"  Contract Attitude: {self.contract_attitude} - {attitude_description(self.contract_attitude)}\n"
             f"  Damage Type: {self.damage_type()}\n"
             f"  XP: {self.xp}/{self.xp_to_next_level()}\n"
             f"  Stats: {stat_text}\n"
